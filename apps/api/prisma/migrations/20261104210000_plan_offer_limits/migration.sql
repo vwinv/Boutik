@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Plan" ADD COLUMN "commissionPct" DOUBLE PRECISION;
+ALTER TABLE "Plan" ADD COLUMN "maxCatalogItems" INTEGER;
+ALTER TABLE "Plan" ADD COLUMN "maxCollaborators" INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE "Plan" ADD COLUMN "maxAppointments" INTEGER;

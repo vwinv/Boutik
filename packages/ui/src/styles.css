@@ -1,0 +1,17 @@
+@theme {
+  --color-ink: #1c1915;
+  --color-paper: #f4efe6;
+  --color-sand: #e7dfd2;
+  --color-clay: #c45c26;
+  --color-clay-dark: #9a4318;
+  --color-moss: #3d5a45;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  min-height: 100vh;
+}

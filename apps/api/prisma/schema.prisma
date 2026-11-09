@@ -1,0 +1,1183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Category {
+  VITRINE
+  RESTAURANT
+  BOUTIQUE
+}
+
+enum TenantStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum StaffRole {
+  NONE
+  SUPPORT
+  FINANCE
+  MODERATION
+  ADMIN
+  OWNER
+}
+
+enum StaffAccountStatus {
+  ACTIVE
+  DISABLED
+  INVITED
+}
+
+enum AuthAudience {
+  STAFF
+  PRO
+  STOREFRONT
+}
+
+enum TokenPurpose {
+  EMAIL_VERIFY
+  PHONE_VERIFY
+  PASSWORD_RESET
+}
+
+enum DocumentKind {
+  IDENTITY
+  NINEA
+  RCCM
+  OTHER
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum SiteStatus {
+  DRAFT
+  PUBLISHED
+  SUSPENDED
+}
+
+enum SiteSectionType {
+  HERO
+  TEXT
+  IMAGE
+  BANNER
+  GALLERY
+  CONTACT
+  HOURS
+  CTA
+}
+
+enum SiteAssetKind {
+  LOGO
+  COVER
+  FAVICON
+  BANNER
+  SECTION
+}
+
+enum ProductAvailability {
+  IN_STOCK
+  OUT_OF_STOCK
+  MADE_TO_ORDER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReservationSource {
+  STOREFRONT
+  PRO
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  PICKED_UP
+  CANCELLED
+}
+
+enum FulfillmentMethod {
+  DELIVERY
+  PICKUP
+}
+
+enum OrderEventType {
+  CREATED
+  STATUS
+  NOTIFICATION
+  PAYMENT
+}
+
+enum OrderPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  COD
+}
+
+enum OrderPaymentProvider {
+  NONE
+  PAYDUNYA
+  COD
+}
+
+enum NotifyChannel {
+  EMAIL
+  SMS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
+enum SubscriptionRestriction {
+  NONE
+  READ_ONLY
+}
+
+enum PaymentStatus {
+  PENDING
+  VALIDATED
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  MOBILE_MONEY
+  OTHER
+}
+
+enum SubscriptionEventType {
+  CREATED
+  RENEWED
+  PERIOD
+  PAYMENT
+  RECEIPT
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  email              String               @unique
+  passwordHash       String
+  name               String
+  phone              String?
+  staffRole          StaffRole            @default(NONE)
+  staffStatus        StaffAccountStatus   @default(ACTIVE)
+  staffTwoFaEnabled  Boolean              @default(false)
+  staffInvitedAt     DateTime?
+  lastLoginAt        DateTime?
+  emailVerifiedAt    DateTime?
+  phoneVerifiedAt    DateTime?
+  onboardingCategory Category?
+  onboardingProfile  Json?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  memberships        Membership[]
+  customers          TenantCustomer[]
+  refreshTokens      RefreshToken[]
+  verificationTokens VerificationToken[]
+  professionals      Professional[]
+  orders             Order[]
+  productReviews     ProductReview[]
+  recordedPayments   SubscriptionPayment[] @relation("PaymentRecorder")
+  assignedTickets    SupportTicket[]       @relation("SupportTicketAssignee")
+
+  @@index([staffRole, staffStatus])
+}
+
+model Professional {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  displayName String
+  jobTitle    String?
+  bio         String?
+  phone       String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  tenants     Tenant[]
+
+  @@index([ownerUserId])
+}
+
+model Tenant {
+  id                  String           @id @default(cuid())
+  slug                String           @unique
+  name                String
+  category            Category
+  status              TenantStatus     @default(DRAFT)
+  professionalId      String
+  legalName           String?
+  ninea               String?
+  rccm                String?
+  addressLine         String?
+  city                String?
+  region              String?
+  postalCode          String?
+  country             String           @default("SN")
+  contactEmail        String?
+  contactPhone        String?
+  website             String?
+  description         String?
+  timezone            String           @default("Africa/Dakar")
+  locale              String           @default("fr")
+  currency            String           @default("XOF")
+  suspendedAt         DateTime?
+  suspendedReason     String?
+  statusBeforeSuspend TenantStatus?
+  archivedAt          DateTime?
+  /// Gel admin du wallet pro (bloque les retraits).
+  walletFrozenAt      DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  subcategoryId       String?
+  planId              String?
+  planInterval        BillingInterval  @default(MONTHLY)
+  templateId          String?
+  siteCategory        SiteCategory     @relation(fields: [category], references: [code], onDelete: Restrict)
+  professional        Professional     @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  subcategory         SiteSubcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  plan                Plan?            @relation(fields: [planId], references: [id], onDelete: SetNull)
+  template            SiteTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  memberships         Membership[]
+  customers           TenantCustomer[]
+  domains             Domain[]
+  documents           TenantDocument[]
+  selectedOptions     TenantPlanOption[]
+  modules             TenantModule[]
+  whatsappConfig      TenantWhatsAppConfig?
+  whatsappSessions    WhatsAppChatSession[]
+  site                TenantSite?
+  productCategories   ProductCategory[]
+  products            Product[]
+  productReviews      ProductReview[]
+  stockMovements      StockMovement[]
+  reservationSettings ReservationSettings?
+  reservationHours    ReservationHour[]
+  reservations        Reservation[]
+  orderSettings       OrderSettings?
+  orders              Order[]
+  subscriptions       Subscription[]
+  walletEntries       WalletLedgerEntry[]
+  walletWithdrawals   WalletWithdrawal[]
+  notifications       ProNotification[]
+  supportTickets      SupportTicket[]
+
+  @@index([professionalId])
+  @@index([status])
+  @@index([planId])
+  @@index([templateId])
+}
+
+enum SupportTicketCategory {
+  TECHNIQUE
+  PAIEMENT
+  COMMANDE
+  RETRAIT
+  ABONNEMENT
+  PERSONNALISATION
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum SupportMessageAuthor {
+  PRO
+  SUPPORT
+}
+
+/// Ticket de support entre le professionnel et l’équipe Boutik.
+model SupportTicket {
+  id               String                 @id @default(cuid())
+  tenantId         String
+  number           String
+  subject          String
+  category         SupportTicketCategory
+  status           SupportTicketStatus    @default(OPEN)
+  priority         SupportTicketPriority  @default(MEDIUM)
+  createdByUserId  String
+  assignedToUserId String?
+  closedAt         DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo       User?                  @relation("SupportTicketAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  messages         SupportMessage[]
+
+  @@unique([number])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([assignedToUserId])
+}
+
+model SupportMessage {
+  id           String               @id @default(cuid())
+  ticketId     String
+  authorType   SupportMessageAuthor
+  authorUserId String?
+  body         String
+  createdAt    DateTime             @default(now())
+  ticket       SupportTicket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+enum ProNotificationKind {
+  ORDERS
+  PAYMENTS
+  WITHDRAWALS
+  SUBSCRIPTION
+  PUBLICATION
+  SECURITY
+  SUPPORT
+}
+
+/// Notifications destinées au professionnel (espace pro).
+model ProNotification {
+  id         String              @id @default(cuid())
+  tenantId   String
+  kind       ProNotificationKind
+  title      String
+  body       String
+  href       String?
+  /// Clé d’idempotence (ex. order:created:CMD-0005)
+  dedupeKey  String?
+  readAt     DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime            @default(now())
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, readAt])
+  @@index([tenantId, archivedAt])
+}
+
+model SiteCategory {
+  code          Category          @id
+  label         String
+  description   String
+  isActive      Boolean           @default(true)
+  sortOrder     Int               @default(0)
+  subcategories SiteSubcategory[]
+  plans         Plan[]
+  tenants       Tenant[]
+}
+
+model SiteSubcategory {
+  id          String       @id @default(cuid())
+  category    Category
+  slug        String
+  name        String
+  description String?
+  isActive    Boolean      @default(true)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  siteCategory SiteCategory @relation(fields: [category], references: [code], onDelete: Cascade)
+  tenants     Tenant[]
+
+  @@unique([category, slug])
+}
+
+model Plan {
+  id                      String         @id @default(cuid())
+  slug                    String         @unique
+  name                    String
+  description             String
+  category                Category
+  isActive                Boolean        @default(true)
+  isDefault               Boolean        @default(false)
+  includesPremiumTemplates Boolean       @default(false)
+  sortOrder               Int                      @default(0)
+  capabilities            String[]
+  /// Commission plateforme (%) — Boutique / Restaurant. Null = non applicable (Vitrine).
+  commissionPct           Float?
+  /// Limite produits (Boutique) ou plats (Restaurant). Null = illimité.
+  maxCatalogItems         Int?
+  /// Limite de collaborateurs de l’espace.
+  maxCollaborators        Int                      @default(1)
+  /// Limite de rendez-vous (Vitrine). Null = illimité / non applicable.
+  maxAppointments         Int?
+  graceDays               Int                      @default(7)
+  expiredRestriction      SubscriptionRestriction  @default(READ_ONLY)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime       @updatedAt
+  siteCategory            SiteCategory   @relation(fields: [category], references: [code], onDelete: Restrict)
+  prices                  PlanPrice[]
+  options                 PlanOption[]
+  tenants                 Tenant[]
+  subscriptions           Subscription[]
+
+  @@index([category, isActive])
+}
+
+model PlanPrice {
+  id        String          @id @default(cuid())
+  planId    String
+  interval  BillingInterval
+  amountXof Int
+  isActive  Boolean         @default(true)
+  plan      Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, interval])
+}
+
+model PlanOption {
+  id          String   @id @default(cuid())
+  planId      String
+  slug        String
+  name        String
+  description String?
+  amountXof   Int
+  capability  String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tenants     TenantPlanOption[]
+
+  @@unique([planId, slug])
+}
+
+model SiteTemplate {
+  id           String             @id @default(cuid())
+  slug         String             @unique
+  name         String
+  description  String
+  isPremium    Boolean            @default(false)
+  isActive     Boolean            @default(true)
+  previewUrl   String?
+  thumbnailUrl String?
+  sortOrder    Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  categories   TemplateCategory[]
+  tenants      Tenant[]
+}
+
+model TemplateCategory {
+  templateId String
+  category   Category
+  template   SiteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@id([templateId, category])
+}
+
+model TenantSite {
+  id               String      @id @default(cuid())
+  tenantId         String      @unique
+  status           SiteStatus  @default(DRAFT)
+  title            String
+  tagline          String?
+  about            String?
+  layoutKey        String?
+  primaryColor     String      @default("#3D5A40")
+  secondaryColor   String      @default("#C45C26")
+  backgroundColor  String      @default("#F4EFE6")
+  textColor        String      @default("#1C1917")
+  logoUrl          String?
+  coverUrl         String?
+  bannerUrl        String?
+  faviconUrl       String?
+  email            String?
+  phone            String?
+  whatsapp         String?
+  addressLine      String?
+  city             String?
+  facebookUrl      String?
+  instagramUrl     String?
+  tiktokUrl        String?
+  youtubeUrl       String?
+  linkedinUrl      String?
+  xUrl             String?
+  seoTitle         String?
+  seoDescription   String?
+  seoKeywords      String?
+  ogImageUrl       String?
+  publishedAt      DateTime?
+  unpublishedAt    DateTime?
+  suspendedAt      DateTime?
+  suspendedReason  String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pages            SitePage[]
+  hours            SiteOpeningHour[]
+  assets           SiteAsset[]
+}
+
+model SitePage {
+  id             String        @id @default(cuid())
+  siteId         String
+  slug           String
+  title          String
+  isHome         Boolean       @default(false)
+  isVisible      Boolean       @default(true)
+  sortOrder      Int           @default(0)
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  site           TenantSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  sections       SiteSection[]
+
+  @@unique([siteId, slug])
+  @@index([siteId, sortOrder])
+}
+
+model SiteSection {
+  id        String          @id @default(cuid())
+  pageId    String
+  type      SiteSectionType
+  title     String?
+  body      String?
+  imageUrl  String?
+  sortOrder Int             @default(0)
+  isVisible Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  page      SitePage        @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, sortOrder])
+}
+
+model SiteOpeningHour {
+  id        String     @id @default(cuid())
+  siteId    String
+  weekday   Int
+  opensAt   String?
+  closesAt  String?
+  isClosed  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  site      TenantSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, weekday])
+}
+
+model SiteAsset {
+  id           String        @id @default(cuid())
+  siteId       String
+  sectionId    String?
+  kind         SiteAssetKind
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  alt          String?
+  createdAt    DateTime      @default(now())
+  site         TenantSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, kind])
+}
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  tenantId    String
+  slug        String
+  name        String
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+}
+
+model Product {
+  id                String              @id @default(cuid())
+  tenantId          String
+  categoryId        String?
+  slug              String
+  name              String
+  description       String?
+  priceXof          Int
+  compareAtPriceXof Int?
+  availability      ProductAvailability @default(IN_STOCK)
+  stockQty          Int?
+  lowStockThreshold Int?
+  isFeatured        Boolean             @default(false)
+  isActive          Boolean             @default(true)
+  isPublished       Boolean             @default(false)
+  sortOrder         Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category          ProductCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  variants          ProductVariant[]
+  photos            ProductPhoto[]
+  reviews           ProductReview[]
+  stockMovements    StockMovement[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+  @@index([tenantId, isPublished, isActive])
+  @@index([tenantId, isFeatured])
+}
+
+enum StockMovementReason {
+  ORDER
+  RESTOCK
+  ADJUSTMENT
+}
+
+/// Historique des mouvements de stock (réappro, ajustements ; ventes aussi via OrderItem).
+model StockMovement {
+  id        String              @id @default(cuid())
+  tenantId  String
+  productId String
+  variantId String?
+  delta     Int
+  reason    StockMovementReason
+  orderId   String?
+  note      String?
+  createdAt DateTime            @default(now())
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([productId, createdAt])
+}
+
+model ProductReview {
+  id          String   @id @default(cuid())
+  tenantId    String
+  productId   String
+  userId      String?
+  authorName  String
+  rating      Int
+  body        String
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, userId])
+  @@index([productId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+model ProductVariant {
+  id                String               @id @default(cuid())
+  productId         String
+  name              String
+  sku               String?
+  priceXof          Int?
+  availability      ProductAvailability?
+  stockQty          Int?
+  lowStockThreshold Int?
+  option1Kind       String?
+  option1Value      String?
+  option2Kind       String?
+  option2Value      String?
+  /// Toutes les options [{ kind, value }] — au-delà de 2 attributs
+  options           Json?
+  isActive          Boolean              @default(true)
+  sortOrder         Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  product           Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@index([productId, option1Kind, option1Value])
+}
+
+model ProductPhoto {
+  id           String   @id @default(cuid())
+  productId    String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  alt          String?
+  /// Liée à une valeur d’option principale (souvent Couleur), style SKC Shein
+  optionKind   String?
+  optionValue  String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@index([productId, optionKind, optionValue])
+}
+
+model ReservationSettings {
+  id                     String   @id @default(cuid())
+  tenantId               String   @unique
+  isEnabled              Boolean  @default(true)
+  autoConfirm            Boolean  @default(true)
+  slotDurationMinutes    Int      @default(90)
+  slotIntervalMinutes    Int      @default(30)
+  minPartySize           Int      @default(1)
+  maxPartySize           Int      @default(8)
+  maxCoversPerSlot       Int      @default(24)
+  maxReservationsPerSlot Int      @default(12)
+  minAdvanceHours        Int      @default(2)
+  maxAdvanceDays         Int      @default(30)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model ReservationHour {
+  id        String   @id @default(cuid())
+  tenantId  String
+  weekday   Int
+  opensAt   String?
+  closesAt  String?
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, weekday])
+}
+
+model Reservation {
+  id          String            @id @default(cuid())
+  tenantId    String
+  date        DateTime          @db.Date
+  time        String
+  partySize   Int
+  guestName   String
+  guestEmail  String?
+  guestPhone  String
+  note        String?
+  status      ReservationStatus @default(PENDING)
+  source      ReservationSource @default(STOREFRONT)
+  cancelledAt DateTime?
+  cancelReason String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date, time])
+  @@index([tenantId, status])
+}
+
+model OrderSettings {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  isEnabled           Boolean  @default(true)
+  pickupEnabled       Boolean  @default(true)
+  deliveryEnabled     Boolean  @default(true)
+  deliveryFeeXof      Int      @default(1500)
+  freeDeliveryFromXof Int?
+  minOrderXof         Int      @default(0)
+  notifyEmail         Boolean  @default(true)
+  notifySms           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id                   String                @id @default(cuid())
+  tenantId             String
+  number               String
+  status               OrderStatus           @default(PENDING)
+  fulfillment          FulfillmentMethod
+  customerUserId       String?
+  customerName         String
+  customerEmail        String?
+  customerPhone        String
+  addressLine          String?
+  city                 String?
+  region               String?
+  postalCode           String?
+  note                 String?
+  subtotalXof          Int
+  deliveryFeeXof       Int                   @default(0)
+  totalXof             Int
+  currency             String                @default("XOF")
+  paymentStatus        OrderPaymentStatus    @default(PENDING)
+  paymentProvider      OrderPaymentProvider  @default(NONE)
+  paymentMethod        String?
+  paydunyaToken        String?
+  paydunyaInvoiceUrl   String?
+  paidAt               DateTime?
+  cancelledAt          DateTime?
+  cancelReason         String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer             User?                 @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
+  items                OrderItem[]
+  events               OrderEvent[]
+  walletEntries        WalletLedgerEntry[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([paydunyaToken])
+  @@index([tenantId, paymentStatus])
+}
+
+enum WalletEntryType {
+  CREDIT
+  DEBIT
+}
+
+enum WalletEntryReason {
+  ORDER_SALE
+  WITHDRAWAL
+  REFUND
+  ADJUSTMENT
+}
+
+enum WalletWithdrawalStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+  CANCELLED
+}
+
+/// Mouvements du wallet pro (crédits ventes Drop One → débit retraits).
+model WalletLedgerEntry {
+  id           String            @id @default(cuid())
+  tenantId     String
+  type         WalletEntryType
+  reason       WalletEntryReason
+  amountXof    Int
+  currency     String            @default("XOF")
+  orderId      String?
+  withdrawalId String?
+  /// Fonds libérés pour retrait (immédiat dès l’encaissement).
+  availableAt  DateTime          @default(now())
+  note         String?
+  createdAt    DateTime          @default(now())
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order        Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  withdrawal   WalletWithdrawal? @relation(fields: [withdrawalId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, reason])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, availableAt])
+  @@index([withdrawalId])
+}
+
+model WalletWithdrawal {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  amountXof      Int
+  currency       String                 @default("XOF")
+  status         WalletWithdrawalStatus @default(PENDING)
+  method         String                 @default("MOBILE_MONEY")
+  destination    String
+  destinationName String?
+  requestedByUserId String?
+  processedAt    DateTime?
+  paidAt         DateTime?
+  failureReason  String?
+  note           String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ledgerEntries  WalletLedgerEntry[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  productId    String
+  variantId    String?
+  productName  String
+  variantName  String?
+  unitPriceXof Int
+  quantity     Int
+  lineTotalXof Int
+  createdAt    DateTime @default(now())
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id         String          @id @default(cuid())
+  orderId    String
+  type       OrderEventType
+  fromStatus OrderStatus?
+  toStatus   OrderStatus?
+  channel    NotifyChannel?
+  message    String?
+  createdAt  DateTime        @default(now())
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model Subscription {
+  id                   String                    @id @default(cuid())
+  tenantId             String
+  planId               String
+  interval             BillingInterval
+  status               SubscriptionStatus        @default(ACTIVE)
+  graceDays            Int                       @default(7)
+  expiredRestriction   SubscriptionRestriction   @default(READ_ONLY)
+  startedAt            DateTime
+  currentPeriodEndsAt  DateTime
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                 Plan                      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  periods              SubscriptionPeriod[]
+  payments             SubscriptionPayment[]
+  events               SubscriptionEvent[]
+
+  @@index([tenantId, status])
+  @@index([planId])
+}
+
+model SubscriptionPeriod {
+  id             String                 @id @default(cuid())
+  subscriptionId String
+  sequence       Int
+  startedAt      DateTime
+  endsAt         DateTime
+  createdAt      DateTime               @default(now())
+  subscription   Subscription           @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments       SubscriptionPayment[]
+
+  @@unique([subscriptionId, sequence])
+}
+
+model SubscriptionPayment {
+  id               String          @id @default(cuid())
+  subscriptionId   String
+  periodId         String
+  amountXof        Int
+  currency         String          @default("XOF")
+  status           PaymentStatus   @default(PENDING)
+  method           PaymentMethod   @default(OTHER)
+  reference        String?
+  failureReason    String?
+  paidAt           DateTime?
+  recordedByUserId String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  subscription     Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  period           SubscriptionPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  recordedBy       User?           @relation("PaymentRecorder", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  receipts         PaymentReceipt[]
+
+  @@index([subscriptionId, status])
+  @@index([periodId])
+}
+
+model PaymentReceipt {
+  id           String               @id @default(cuid())
+  paymentId    String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  createdAt    DateTime             @default(now())
+  payment      SubscriptionPayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+model SubscriptionEvent {
+  id             String                 @id @default(cuid())
+  subscriptionId String
+  type           SubscriptionEventType
+  message        String?
+  createdAt      DateTime               @default(now())
+  subscription   Subscription           @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+}
+
+model TenantPlanOption {
+  tenantId String
+  optionId String
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  option   PlanOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, optionId])
+}
+
+/// Modules optionnels (hors abonnement) — prix mensuel ajouté à la facture.
+model PlatformModule {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  description String?
+  /// Catégories concernées (ex. SMS = toutes).
+  categories  Category[]
+  amountXof   Int            @default(0)
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  activations TenantModule[]
+}
+
+model TenantModule {
+  tenantId    String
+  moduleId    String
+  activatedAt DateTime       @default(now())
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module      PlatformModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, moduleId])
+  @@index([moduleId])
+}
+
+/// Connexion WhatsApp Cloud API (module Commande WhatsApp — Boutique).
+model TenantWhatsAppConfig {
+  tenantId          String    @id
+  phoneNumberId     String
+  displayPhone      String?
+  accessToken       String
+  businessAccountId String?
+  isEnabled         Boolean   @default(true)
+  connectedAt       DateTime?
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([phoneNumberId])
+}
+
+/// Session conversationnelle panier WhatsApp.
+model WhatsAppChatSession {
+  id        String   @id @default(cuid())
+  tenantId  String
+  waId      String
+  state     String   @default("menu")
+  cartJson  Json     @default("[]")
+  draftJson Json     @default("{}")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, waId])
+  @@index([tenantId, updatedAt])
+}
+
+model TenantDocument {
+  id           String       @id @default(cuid())
+  tenantId     String
+  kind         DocumentKind
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  createdAt    DateTime     @default(now())
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Membership {
+  id        String         @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      MembershipRole
+  createdAt DateTime       @default(now())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+}
+
+model TenantCustomer {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+}
+
+model Domain {
+  id         String    @id @default(cuid())
+  tenantId   String
+  host       String    @unique
+  isPrimary  Boolean   @default(false)
+  verifiedAt DateTime?
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String        @id @default(cuid())
+  userId    String
+  tokenHash String        @unique
+  audience  AuthAudience
+  tenantId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+model VerificationToken {
+  id         String       @id @default(cuid())
+  userId     String
+  purpose    TokenPurpose
+  tokenHash  String
+  otp        String?
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime     @default(now())
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash, purpose])
+}

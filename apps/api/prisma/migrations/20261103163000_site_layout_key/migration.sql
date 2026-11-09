@@ -1,0 +1,1 @@
+ALTER TABLE "TenantSite" ADD COLUMN IF NOT EXISTS "layoutKey" TEXT;
