@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 import { ports } from "@boutik/config";
 
+function stripTrailingSlash(url: string) {
+  return url.replace(/\/$/, "");
+}
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@boutik/config", "@boutik/domain", "@boutik/ui"],
   env: {
@@ -8,7 +12,26 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     if (process.env.NODE_ENV === "production") {
-      return [];
+      const api = process.env.API_URL ? stripTrailingSlash(process.env.API_URL) : "";
+      const app = process.env.APP_ORIGIN ? stripTrailingSlash(process.env.APP_ORIGIN) : "";
+      const admin = process.env.ADMIN_ORIGIN ? stripTrailingSlash(process.env.ADMIN_ORIGIN) : "";
+      const rules: { source: string; destination: string }[] = [];
+      if (api) {
+        rules.push({ source: "/api/:path*", destination: `${api}/api/:path*` });
+      }
+      if (admin) {
+        rules.push(
+          { source: "/admin", destination: `${admin}/admin` },
+          { source: "/admin/:path*", destination: `${admin}/admin/:path*` },
+        );
+      }
+      if (app) {
+        rules.push(
+          { source: "/app", destination: `${app}/app` },
+          { source: "/app/:path*", destination: `${app}/app/:path*` },
+        );
+      }
+      return rules;
     }
 
     return [
