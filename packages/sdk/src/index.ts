@@ -89,6 +89,7 @@ export type TenantSitePublic = {
 };
 
 export type StorefrontVariant = {
+  id: string;
   name: string;
   sku: string | null;
   priceXof: number | null;

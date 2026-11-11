@@ -131,6 +131,7 @@ export function presentPublicProduct(
       ? { slug: presented.category.slug, name: presented.category.name }
       : null,
     variants: presented.variants.map((variant) => ({
+      id: variant.id,
       name: variant.name,
       sku: variant.sku,
       priceXof: variant.priceXof,

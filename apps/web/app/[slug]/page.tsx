@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { fetchStorefrontCatalog, fetchTenantBySlug } from "@boutik/sdk";
+import { fetchStorefrontCatalog, fetchTenantBySlug, type StorefrontCatalog } from "@boutik/sdk";
 import { BoutiqueSite } from "../../components/boutique-site";
 import { MaintenancePage } from "../../components/maintenance-page";
 import { isPublicSiteInMaintenance } from "../../lib/maintenance";
@@ -9,6 +9,10 @@ import { publicBasePath, requestHost } from "../../lib/store-paths";
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
+
+function emptyCatalog(slug: string, currency: string): StorefrontCatalog {
+  return { slug, currency, categories: [], products: [] };
+}
 
 export default async function PublicSitePage({ params }: PageProps) {
   const { slug } = await params;
@@ -22,11 +26,11 @@ export default async function PublicSitePage({ params }: PageProps) {
     return <MaintenancePage title={tenant.site?.general.title || tenant.name} />;
   }
 
-  let catalog = { slug, currency: tenant.currency || "XOF", categories: [], products: [] };
+  let catalog: StorefrontCatalog = emptyCatalog(slug, tenant.currency || "XOF");
   try {
     catalog = await fetchStorefrontCatalog(slug);
   } catch {
-    catalog = { slug, currency: tenant.currency || "XOF", categories: [], products: [] };
+    catalog = emptyCatalog(slug, tenant.currency || "XOF");
   }
 
   const host = requestHost(await headers());
