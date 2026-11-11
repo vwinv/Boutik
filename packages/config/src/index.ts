@@ -202,6 +202,9 @@ export function getWhatsappConfig() {
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN?.trim() || "boutik-whatsapp-verify",
     apiVersion: process.env.WHATSAPP_API_VERSION?.trim() || "v21.0",
     graphBaseUrl: (process.env.WHATSAPP_GRAPH_URL?.trim() || "https://graph.facebook.com").replace(/\/$/, ""),
+    appId: process.env.WHATSAPP_APP_ID?.trim() || "",
+    appSecret: process.env.WHATSAPP_APP_SECRET?.trim() || "",
+    embeddedSignupConfigId: process.env.WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID?.trim() || "",
   };
 }
 

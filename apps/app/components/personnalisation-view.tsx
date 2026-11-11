@@ -60,9 +60,11 @@ function PersonnalisationBody() {
   const [toast, setToast] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [pendingLayout, setPendingLayout] = useState<LayoutKey | null>(null);
+  const [previewLayoutKey, setPreviewLayoutKey] = useState<LayoutKey | null>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
   const titleTimer = useRef<number | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
 
   const load = useCallback(async () => {
     const session = readProSession();
@@ -172,6 +174,11 @@ function PersonnalisationBody() {
     setToast("Couleur secondaire mise à jour");
   }
 
+  function previewLayout(id: LayoutKey) {
+    setPreviewLayoutKey(id === layoutKey ? null : id);
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
   function requestLayout(id: LayoutKey) {
     if (id === layoutKey) return;
     setPendingLayout(id);
@@ -181,6 +188,7 @@ function PersonnalisationBody() {
     if (!pendingLayout) return;
     const id = pendingLayout;
     setPendingLayout(null);
+    setPreviewLayoutKey(null);
     setLayoutKey(id);
     await patchTheme({ layoutKey: id });
     setToast(`Modèle « ${layoutName(id)} » appliqué`);
@@ -226,7 +234,9 @@ function PersonnalisationBody() {
   }
 
   const mark = (title.trim() || site.slug || "b").slice(0, 1).toLowerCase();
-  const layout = LAYOUTS.find((item) => item.id === layoutKey) ?? LAYOUTS[0]!;
+  const displayLayoutKey = previewLayoutKey ?? layoutKey;
+  const layout = LAYOUTS.find((item) => item.id === displayLayoutKey) ?? LAYOUTS[0]!;
+  const previewing = previewLayoutKey !== null && previewLayoutKey !== layoutKey;
 
   return (
     <>
@@ -352,11 +362,16 @@ function PersonnalisationBody() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {LAYOUTS.map((item) => {
                 const active = item.id === layoutKey;
+                const isPreview = previewLayoutKey === item.id;
                 return (
                   <article
                     key={item.id}
                     className={`overflow-hidden rounded-2xl border-2 ${
-                      active ? "border-neutral-950" : "border-neutral-200"
+                      active
+                        ? "border-neutral-950"
+                        : isPreview
+                          ? "border-neutral-500"
+                          : "border-neutral-200"
                     }`}
                   >
                     <div
@@ -371,16 +386,20 @@ function PersonnalisationBody() {
                     <div className="p-3.5">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold">{item.name}</p>
-                        <span className="text-[11px] text-neutral-500">{item.badge}</span>
+                        <span className="text-[11px] text-neutral-500">
+                          {isPreview && !active ? "Aperçu" : item.badge}
+                        </span>
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.blurb}</p>
                       <div className="mt-3 flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setViewport("desktop")}
-                          className="flex-1 rounded-xl border border-neutral-200 px-2 py-2 text-xs font-medium"
+                          onClick={() => previewLayout(item.id)}
+                          className={`flex-1 rounded-xl border px-2 py-2 text-xs font-medium ${
+                            isPreview ? "border-neutral-950 bg-neutral-950 text-white" : "border-neutral-200"
+                          }`}
                         >
-                          Prévisualiser
+                          {isPreview ? "Aperçu actif" : "Prévisualiser"}
                         </button>
                         <button
                           type="button"
@@ -402,7 +421,7 @@ function PersonnalisationBody() {
           {saving ? <p className="px-1 text-xs text-neutral-500">Enregistrement…</p> : null}
         </div>
 
-        <aside className="xl:sticky xl:top-24 xl:self-start">
+        <aside className="xl:sticky xl:top-24 xl:self-start" ref={previewRef}>
           <section className="rounded-[24px] bg-white p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-base font-semibold tracking-tight">Aperçu en direct</h2>
@@ -428,6 +447,30 @@ function PersonnalisationBody() {
               </div>
             </div>
 
+            {previewing ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-neutral-950 px-3.5 py-2.5 text-sm text-white">
+                <p>
+                  Aperçu « {layoutName(previewLayoutKey!)} » — pas encore appliqué
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewLayoutKey(null)}
+                    className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium"
+                  >
+                    Fermer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => requestLayout(previewLayoutKey!)}
+                    className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-neutral-950"
+                  >
+                    Utiliser
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 overflow-hidden rounded-[18px] border border-neutral-200 bg-neutral-50">
               <div
                 className={`mx-auto overflow-hidden transition-[max-width] duration-300 ${
@@ -438,7 +481,7 @@ function PersonnalisationBody() {
                   title={title || site.slug}
                   mark={mark}
                   logoUrl={logoUrl}
-                  layoutKey={layoutKey}
+                  layoutKey={displayLayoutKey}
                   primary={primary}
                   secondary={secondary}
                   coverUrl={coverUrl}

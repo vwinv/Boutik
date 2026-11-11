@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@boutik/config", "@boutik/domain", "@boutik/sdk", "@boutik/ui"],
   env: {
     PUBLIC_ORIGIN: process.env.PUBLIC_ORIGIN ?? "http://localhost:3000",
+    NEXT_PUBLIC_WHATSAPP_EMBEDDED_ORIGIN: process.env.NEXT_PUBLIC_WHATSAPP_EMBEDDED_ORIGIN ?? "",
   },
   async rewrites() {
     if (process.env.NODE_ENV === "production") return [];

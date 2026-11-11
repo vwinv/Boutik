@@ -20,12 +20,13 @@ export function AuthImage({
 
     async function load() {
       setFailed(false);
-      if (!src) {
+      const source = typeof src === "string" ? src : "";
+      if (!source) {
         setResolved(null);
         return;
       }
-      if (/^(https?:|data:|blob:)/i.test(src)) {
-        setResolved(src);
+      if (/^(https?:|data:|blob:)/i.test(source)) {
+        setResolved(source);
         return;
       }
 
@@ -37,7 +38,7 @@ export function AuthImage({
       }
 
       try {
-        const response = await fetch(src, {
+        const response = await fetch(source, {
           headers: { Authorization: `Bearer ${session.accessToken}` },
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -59,7 +60,7 @@ export function AuthImage({
     };
   }, [src]);
 
-  if (!src || failed || !resolved) {
+  if (typeof src !== "string" || !src || failed || !resolved) {
     return <>{fallback ?? null}</>;
   }
 

@@ -192,8 +192,8 @@ function ProduitsBody() {
     });
   }, [products, filter, query]);
 
-  async function createCategory(values: { name: string; description: string }) {
-    if (!tenantId) return;
+  async function createCategory(values: { name: string; description: string }): Promise<boolean> {
+    if (!tenantId) return false;
     setBusy(true);
     setError(null);
     try {

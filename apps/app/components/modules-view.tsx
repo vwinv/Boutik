@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { proApi } from "../lib/api";
 import { activeProMembership, fetchProMe, formatXof, readProSession } from "../lib/auth";
@@ -20,15 +21,8 @@ type Payload = { items: ModuleItem[] };
 type WhatsappConfig = {
   moduleActive: boolean;
   configured: boolean;
-  phoneNumberId: string | null;
+  status?: string;
   displayPhone: string | null;
-  businessAccountId: string | null;
-  isEnabled: boolean;
-  connectedAt: string | null;
-  lastError: string | null;
-  accessTokenMasked: string | null;
-  webhookUrl: string;
-  verifyTokenHint: string | null;
 };
 
 export function ModulesPage() {
@@ -174,158 +168,26 @@ function ModulesBody() {
         </ul>
       )}
 
-      {whatsapp && tenantId ? (
-        <WhatsappConfigPanel
-          tenantId={tenantId}
-          initial={whatsapp}
-          onSaved={(next) => setWhatsapp(next)}
-          onError={setError}
-        />
+      {whatsapp ? (
+        <section className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">Boutique WhatsApp</h2>
+              <p className="mt-1 text-sm text-neutral-600">
+                {whatsapp.configured
+                  ? `Connecté${whatsapp.displayPhone ? ` · ${whatsapp.displayPhone}` : ""}. Gérez ouverture, messages et connexion.`
+                  : "Module actif — connectez votre numéro pour recevoir des commandes."}
+              </p>
+            </div>
+            <Link
+              href="/whatsapp"
+              className="rounded-full bg-neutral-950 px-4 py-2 text-sm font-medium text-white"
+            >
+              {whatsapp.configured ? "Gérer WhatsApp" : "Connecter WhatsApp"}
+            </Link>
+          </div>
+        </section>
       ) : null}
     </div>
-  );
-}
-
-function WhatsappConfigPanel({
-  tenantId,
-  initial,
-  onSaved,
-  onError,
-}: {
-  tenantId: string;
-  initial: WhatsappConfig;
-  onSaved: (value: WhatsappConfig) => void;
-  onError: (value: string | null) => void;
-}) {
-  const [phoneNumberId, setPhoneNumberId] = useState(initial.phoneNumberId ?? "");
-  const [displayPhone, setDisplayPhone] = useState(initial.displayPhone ?? "");
-  const [accessToken, setAccessToken] = useState("");
-  const [businessAccountId, setBusinessAccountId] = useState(initial.businessAccountId ?? "");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPhoneNumberId(initial.phoneNumberId ?? "");
-    setDisplayPhone(initial.displayPhone ?? "");
-    setBusinessAccountId(initial.businessAccountId ?? "");
-  }, [initial]);
-
-  async function saveProper(event: React.FormEvent) {
-    event.preventDefault();
-    if (!phoneNumberId.trim()) {
-      onError("Le Phone Number ID Meta est requis.");
-      return;
-    }
-    if (!accessToken.trim()) {
-      onError(
-        initial.configured
-          ? "Pour modifier la config, renseignez à nouveau le token d’accès (non stocké en clair côté interface)."
-          : "Le token d’accès WhatsApp est requis.",
-      );
-      return;
-    }
-    setBusy(true);
-    onError(null);
-    setNotice(null);
-    try {
-      const payload = await proApi<WhatsappConfig>(`/api/workspaces/${tenantId}/whatsapp`, {
-        method: "PUT",
-        body: JSON.stringify({
-          phoneNumberId: phoneNumberId.trim(),
-          displayPhone: displayPhone.trim() || undefined,
-          accessToken: accessToken.trim(),
-          businessAccountId: businessAccountId.trim() || undefined,
-          isEnabled: true,
-        }),
-      });
-      onSaved(payload);
-      setAccessToken("");
-      setNotice("Configuration WhatsApp enregistrée.");
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "Enregistrement WhatsApp impossible.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Configuration WhatsApp</h2>
-          <p className="mt-1 text-sm text-neutral-600">
-            Branchez votre numéro WhatsApp Business Cloud API pour que vos clients commandent dans WhatsApp.
-          </p>
-        </div>
-        <span
-          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-            initial.configured ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-          }`}
-        >
-          {initial.configured ? "Connecté" : "À configurer"}
-        </span>
-      </div>
-
-      <div className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-600">
-        <p>
-          Webhook URL : <span className="font-mono text-neutral-900">{initial.webhookUrl}</span>
-        </p>
-        <p className="mt-1">{initial.verifyTokenHint}</p>
-        {initial.accessTokenMasked ? (
-          <p className="mt-1">Token actuel : <span className="font-mono">{initial.accessTokenMasked}</span></p>
-        ) : null}
-      </div>
-
-      <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => void saveProper(event)}>
-        <label className="block text-sm sm:col-span-1">
-          <span className="text-neutral-500">Phone Number ID</span>
-          <input
-            value={phoneNumberId}
-            onChange={(event) => setPhoneNumberId(event.target.value)}
-            required
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
-            placeholder="Ex. 123456789012345"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-neutral-500">Numéro affiché (E.164)</span>
-          <input
-            value={displayPhone}
-            onChange={(event) => setDisplayPhone(event.target.value)}
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
-            placeholder="+22177…"
-          />
-        </label>
-        <label className="block text-sm sm:col-span-2">
-          <span className="text-neutral-500">Access token Meta</span>
-          <input
-            type="password"
-            value={accessToken}
-            onChange={(event) => setAccessToken(event.target.value)}
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
-            placeholder={initial.configured ? "Coller un nouveau token pour mettre à jour" : "EAAG…"}
-            autoComplete="off"
-          />
-        </label>
-        <label className="block text-sm sm:col-span-2">
-          <span className="text-neutral-500">WhatsApp Business Account ID (optionnel)</span>
-          <input
-            value={businessAccountId}
-            onChange={(event) => setBusinessAccountId(event.target.value)}
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
-          />
-        </label>
-        {notice ? <p className="sm:col-span-2 text-sm text-emerald-700">{notice}</p> : null}
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-full bg-neutral-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {busy ? "Enregistrement…" : "Enregistrer WhatsApp"}
-          </button>
-        </div>
-      </form>
-    </section>
   );
 }

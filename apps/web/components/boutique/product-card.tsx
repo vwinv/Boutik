@@ -11,9 +11,9 @@ export function ProductCard({ product }: { product: StorefrontProduct }) {
   const rupture = product.availability === "OUT_OF_STOCK";
 
   return (
-    <article className="min-w-0">
+    <article className="product-lift group min-w-0">
       <div className="relative overflow-hidden rounded-[22px]" style={{ background: "var(--site-card)" }}>
-        <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        <img src={image} alt="" className="zoom-img aspect-[4/5] w-full object-cover" />
         {promo ? (
           <span
             className="absolute top-3 left-3 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"
@@ -51,7 +51,7 @@ export function ProductCard({ product }: { product: StorefrontProduct }) {
             image,
           })
         }
-        className="mt-3 rounded-full px-3.5 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+        className="soft mt-3 rounded-full px-3.5 py-1.5 text-xs font-medium text-white disabled:opacity-40"
         style={{ background: "var(--site-primary)" }}
       >
         {rupture ? "Indisponible" : "Ajouter au panier"}

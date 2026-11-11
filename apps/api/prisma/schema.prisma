@@ -1083,7 +1083,16 @@ model TenantWhatsAppConfig {
   accessToken       String
   businessAccountId String?
   isEnabled         Boolean   @default(true)
+  /// Boutique ouverte aux commandes WhatsApp (indépendant du module).
+  shopOpen          Boolean   @default(true)
+  allowPickup       Boolean   @default(true)
+  allowDelivery     Boolean   @default(true)
+  welcomeMessage    String?
+  closedMessage     String?
+  openTime          String?
+  closeTime         String?
   connectedAt       DateTime?
+  lastInboundAt     DateTime?
   lastError         String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

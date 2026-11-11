@@ -62,6 +62,13 @@ export class WhatsappConversationService {
       return;
     }
 
+    void this.prisma.tenantWhatsAppConfig
+      .update({
+        where: { tenantId: config.tenantId },
+        data: { lastInboundAt: new Date(), lastError: null },
+      })
+      .catch(() => undefined);
+
     const session = await this.loadSession(config.tenantId, message.from);
     const reply = message.buttonId || message.listId || message.text?.trim() || "";
     const ctx = {
@@ -71,7 +78,21 @@ export class WhatsappConversationService {
       shop: config.tenant.name,
       tenantId: config.tenantId,
       currency: config.tenant.currency || "XOF",
+      welcomeMessage: config.welcomeMessage,
+      closedMessage: config.closedMessage,
+      allowPickup: config.allowPickup,
+      allowDelivery: config.allowDelivery,
     };
+
+    if (!config.isEnabled || !isShopAcceptingOrders(config)) {
+      await this.cloud.sendText({
+        ...ctx,
+        text:
+          config.closedMessage?.trim() ||
+          `« ${config.tenant.name} » est temporairement fermée sur WhatsApp. Réessayez plus tard.`,
+      });
+      return;
+    }
 
     try {
       if (!reply || isGreeting(reply) || reply === "menu" || reply === "aide") {
@@ -122,15 +143,31 @@ export class WhatsappConversationService {
         return;
       }
       if (reply === "checkout") {
+        const buttons = [
+          ...(ctx.allowPickup ? [{ id: "ful:PICKUP", title: "Retrait" }] : []),
+          ...(ctx.allowDelivery ? [{ id: "ful:DELIVERY", title: "Livraison" }] : []),
+        ];
+        if (buttons.length === 1) {
+          const fulfillment = buttons[0]!.id.slice(4) === "DELIVERY" ? "DELIVERY" : "PICKUP";
+          session.draft.fulfillment = fulfillment;
+          if (fulfillment === "DELIVERY") {
+            session.state = "address";
+            await this.saveSession(session);
+            await this.cloud.sendText({
+              ...ctx,
+              text: "Indiquez votre adresse de livraison (rue, quartier, ville).",
+            });
+            return;
+          }
+          await this.askNameOrConfirm(ctx, session, message.contactName);
+          return;
+        }
         session.state = "fulfillment";
         await this.saveSession(session);
         await this.cloud.sendButtons({
           ...ctx,
           body: "Comment souhaitez-vous recevoir la commande ?",
-          buttons: [
-            { id: "ful:PICKUP", title: "Retrait" },
-            { id: "ful:DELIVERY", title: "Livraison" },
-          ],
+          buttons,
         });
         return;
       }
@@ -188,14 +225,23 @@ export class WhatsappConversationService {
   }
 
   private async sendMenu(
-    ctx: { phoneNumberId: string; accessToken: string; to: string; shop: string },
+    ctx: {
+      phoneNumberId: string;
+      accessToken: string;
+      to: string;
+      shop: string;
+      welcomeMessage?: string | null;
+    },
     session: Session,
   ) {
     session.state = "menu";
     await this.saveSession(session);
+    const body =
+      ctx.welcomeMessage?.trim() ||
+      `Bienvenue chez ${ctx.shop} 👋\nCommandez directement ici, sans passer par le site.`;
     await this.cloud.sendButtons({
       ...ctx,
-      body: `Bienvenue chez ${ctx.shop} 👋\nCommandez directement ici, sans passer par le site.`,
+      body,
       footer: "Boutique WhatsApp Boutik",
       buttons: [
         { id: "catalog", title: "Catalogue" },
@@ -554,6 +600,29 @@ function parseDraft(value: Prisma.JsonValue): Draft {
 function isGreeting(value: string) {
   const v = value.toLowerCase();
   return ["bonjour", "bonsoir", "salut", "hello", "hi", "hey", "start", "demarrer", "démarrer"].includes(v);
+}
+
+function isShopAcceptingOrders(config: {
+  shopOpen: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+}) {
+  if (!config.shopOpen) return false;
+  if (!config.openTime || !config.closeTime) return true;
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Abidjan",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const hour = parts.find((part) => part.type === "hour")?.value || "00";
+  const minute = parts.find((part) => part.type === "minute")?.value || "00";
+  const current = `${hour}:${minute}`;
+  if (config.openTime <= config.closeTime) {
+    return current >= config.openTime && current <= config.closeTime;
+  }
+  return current >= config.openTime || current <= config.closeTime;
 }
 
 function formatXof(value: number) {

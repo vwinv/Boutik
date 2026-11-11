@@ -117,6 +117,46 @@ export function workspaceAuthUrl(
   return url.toString();
 }
 
+/**
+ * Origine unique pour Facebook JS SDK / Embedded Signup.
+ * Évite d’enregistrer admin.{slug}.* chez Meta : un seul domaine plateforme.
+ * Override local (tunnel HTTPS) via NEXT_PUBLIC_WHATSAPP_EMBEDDED_ORIGIN.
+ */
+export function whatsappEmbeddedOrigin(origin = publicOrigin()) {
+  const override = process.env.NEXT_PUBLIC_WHATSAPP_EMBEDDED_ORIGIN?.trim().replace(/\/$/, "");
+  if (override) return override;
+  return origin.replace(/\/$/, "");
+}
+
+export function whatsappEmbeddedConnectUrl(path = "/app/whatsapp", origin = publicOrigin()) {
+  const base = whatsappEmbeddedOrigin(origin);
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
+}
+
+/** Passe la session pro vers une autre origine (localStorage non partagé entre sous-domaines). */
+export function withBoutikAuthHash(
+  targetUrl: string,
+  session: { accessToken: string; refreshToken: string },
+) {
+  const url = new URL(targetUrl);
+  url.hash = `boutik_auth=${encodeURIComponent(
+    JSON.stringify({
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+    }),
+  )}`;
+  return url.toString();
+}
+
+export function isWhatsappEmbeddedOrigin(currentOrigin: string, origin = publicOrigin()) {
+  try {
+    return currentOrigin.replace(/\/$/, "") === whatsappEmbeddedOrigin(origin);
+  } catch {
+    return false;
+  }
+}
+
 function buildTenantUrl(
   slug: string,
   path: string,

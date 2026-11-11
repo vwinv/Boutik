@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { siteUrl } from "@boutik/domain";
+import { siteUrl, whatsappEmbeddedOrigin } from "@boutik/domain";
 import { proApi } from "../lib/api";
 import {
   activeProMembership,
@@ -53,13 +53,13 @@ const PRINCIPAL: NavItem[] = [
 const BOUTIQUE: NavItem[] = [
   { href: "/produits", label: "Produits", requires: ["catalog", "menu"] },
   { href: "/commandes", label: "Commandes", requires: ["orders"] },
+  { href: "/whatsapp", label: "WhatsApp", requires: ["orders"] },
   { href: "/clients", label: "Clients", requires: ["customers"] },
   { href: "/stock", label: "Stock", requires: ["stock"] },
 ];
 
 const GESTION: NavItem[] = [
   { href: "/wallet", label: "Wallet", requires: ["wallet"] },
-  { href: "/modules", label: "Modules" },
   { href: "/abonnement", label: "Abonnement" },
   { href: "/notifications", label: "Notifications" },
   { href: "/support", label: "Support" },
@@ -279,7 +279,22 @@ export function ProShell({
 }
 
 function proLoginUrl() {
-  return `${(process.env.PUBLIC_ORIGIN || "http://localhost:3000").replace(/\/$/, "")}/connexion`;
+  const publicOrigin = (process.env.PUBLIC_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
+  const embeddedOrigin = whatsappEmbeddedOrigin();
+  const currentPath =
+    typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/app";
+  const nextPath = currentPath.startsWith("/app") ? currentPath : `/app${currentPath === "/" ? "" : currentPath}`;
+  const next = encodeURIComponent(nextPath);
+
+  // Sur tunnel HTTPS / origine Meta, rester sur la même origine pour le login.
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return `${window.location.origin}/connexion?next=${next}`;
+  }
+  // En local HTTP, préférer l’origine Embedded (tunnel) si différente de PUBLIC_ORIGIN.
+  if (embeddedOrigin && embeddedOrigin !== publicOrigin) {
+    return `${embeddedOrigin}/connexion?next=${next}`;
+  }
+  return `${publicOrigin}/connexion?next=${next}`;
 }
 
 function NavGroup({

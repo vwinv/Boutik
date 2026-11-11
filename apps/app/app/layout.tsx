@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body className={`${outfit.className} antialiased`}>
+    <html lang="fr" suppressHydrationWarning>
+      <body className={`${outfit.className} antialiased`} suppressHydrationWarning>
         <AuthBootstrap>{children}</AuthBootstrap>
         <GlobalRequestLoading />
       </body>

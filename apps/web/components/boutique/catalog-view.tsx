@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { StorefrontCatalog, TenantPublic } from "@boutik/sdk";
 import { formatPriceXof, productImage } from "../../lib/theme";
 import { storeHref } from "../../lib/store-paths";
+import { Reveal } from "./reveal";
 import { StoreShell } from "./store-shell";
 
 export function CatalogPage({
@@ -55,11 +56,11 @@ function CatalogView({
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
       <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
         <aside className="w-full shrink-0 lg:w-56">
-          <p className="text-xs font-medium tracking-[0.14em] uppercase" style={{ color: "var(--site-muted)" }}>
+          <p className="rise text-xs font-medium tracking-[0.14em] uppercase" style={{ color: "var(--site-muted)" }}>
             Catégories
           </p>
           <nav
-            className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0"
+            className="rise rise-delay-1 mt-4 flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0"
             aria-label="Catégories"
           >
             <CategoryLink
@@ -79,7 +80,7 @@ function CatalogView({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="rise rise-delay-1 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{activeName}</h1>
               <p className="mt-2 text-sm" style={{ color: "var(--site-muted)" }}>
@@ -89,12 +90,13 @@ function CatalogView({
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-5 lg:grid-cols-3">
-            {filtered.map((product) => (
-              <CatalogProductCard
-                key={product.slug}
-                product={product}
-                href={storeHref(basePath, `/produit/${product.slug}`)}
-              />
+            {filtered.map((product, index) => (
+              <Reveal key={product.slug} delay={Math.min(index, 8) * 60}>
+                <CatalogProductCard
+                  product={product}
+                  href={storeHref(basePath, `/produit/${product.slug}`)}
+                />
+              </Reveal>
             ))}
           </div>
           {!filtered.length ? (
@@ -162,9 +164,9 @@ function CatalogProductCard({
   const rupture = product.availability === "OUT_OF_STOCK";
 
   return (
-    <Link href={href} className="min-w-0 block">
+    <Link href={href} className="product-lift group min-w-0 block">
       <div className="relative overflow-hidden rounded-[22px]" style={{ background: "var(--site-card)" }}>
-        <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        <img src={image} alt="" className="zoom-img aspect-[4/5] w-full object-cover" />
         {promo ? (
           <span
             className="absolute top-3 left-3 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"

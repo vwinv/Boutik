@@ -25,6 +25,20 @@ export function LoginForm() {
         window.location.assign("/onboarding");
         return;
       }
+
+      // Retour explicite (ex. tunnel HTTPS → /app/whatsapp) : rester sur la même origine.
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+      if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
+        const payload = encodeURIComponent(
+          JSON.stringify({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+          }),
+        );
+        window.location.assign(`${nextParam}#boutik_auth=${payload}`);
+        return;
+      }
+
       const slug = resolveWorkspaceSlug(data.user);
       if (!slug) {
         window.location.assign("/app");

@@ -8,6 +8,7 @@ import { isLightLayout, resolveLayout } from "../../lib/theme";
 import { storeHref } from "../../lib/store-paths";
 import { CoverImage } from "./cover-image";
 import { ProductCard } from "./product-card";
+import { Reveal } from "./reveal";
 
 export function HomeView({
   tenant,
@@ -59,7 +60,7 @@ export function HomeView({
           <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:py-16">
             {layout === "atelier" || layout === "minimal" ? (
               <>
-                <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
+                <CoverImage src={cover} className="cover-in h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
                 <HeroCopy
                   eyebrow={eyebrow}
                   tagline={tagline}
@@ -79,7 +80,7 @@ export function HomeView({
                   darkHero={darkHero}
                   category={tenant.category}
                 />
-                <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
+                <CoverImage src={cover} className="cover-in h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
               </>
             )}
           </div>
@@ -88,15 +89,19 @@ export function HomeView({
 
       {blocks.featured && featured.length ? (
         <section id="mis-en-avant" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <div className="flex items-end justify-between gap-4">
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{blocks.featuredTitle}</h2>
-            <Link href={catalogueHref} className="text-sm font-medium" style={{ color: "var(--site-primary)" }}>
-              Voir le catalogue →
-            </Link>
-          </div>
+          <Reveal>
+            <div className="flex items-end justify-between gap-4">
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{blocks.featuredTitle}</h2>
+              <Link href={catalogueHref} className="text-sm font-medium" style={{ color: "var(--site-primary)" }}>
+                Voir le catalogue →
+              </Link>
+            </div>
+          </Reveal>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {featured.map((product) => (
-              <ProductCard key={product.slug} product={product} />
+            {featured.map((product, index) => (
+              <Reveal key={product.slug} delay={index * 70}>
+                <ProductCard product={product} />
+              </Reveal>
             ))}
           </div>
         </section>
@@ -104,24 +109,30 @@ export function HomeView({
 
       {blocks.promotions ? (
         <section id="promotions" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <div className="rounded-[28px] px-6 py-8 sm:px-8" style={{ background: "var(--site-card)" }}>
-            <h2 className="text-3xl font-semibold tracking-tight">{blocks.promotionsTitle}</h2>
-            <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--site-muted)" }}>
-              {blocks.promotionsBody || "Découvrez nos offres du moment."}
-            </p>
-          </div>
+          <Reveal>
+            <div className="rounded-[28px] px-6 py-8 sm:px-8" style={{ background: "var(--site-card)" }}>
+              <h2 className="text-3xl font-semibold tracking-tight">{blocks.promotionsTitle}</h2>
+              <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--site-muted)" }}>
+                {blocks.promotionsBody || "Découvrez nos offres du moment."}
+              </p>
+            </div>
+          </Reveal>
         </section>
       ) : null}
 
       {blocks.about ? (
         <section id="apropos" className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-2">
-          <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-80" />
-          <div>
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{blocks.aboutTitle}</h2>
-            <p className="mt-4 text-base leading-relaxed" style={{ color: "var(--site-muted)" }}>
-              {aboutText}
-            </p>
-          </div>
+          <Reveal>
+            <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-80" />
+          </Reveal>
+          <Reveal delay={120}>
+            <div>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{blocks.aboutTitle}</h2>
+              <p className="mt-4 text-base leading-relaxed" style={{ color: "var(--site-muted)" }}>
+                {aboutText}
+              </p>
+            </div>
+          </Reveal>
         </section>
       ) : null}
 
@@ -232,21 +243,21 @@ function HeroCopy({
 }) {
   return (
     <div>
-      <p className="text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--site-hero-muted)" }}>
+      <p className="rise text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--site-hero-muted)" }}>
         {eyebrow}
       </p>
-      <h1 className="mt-4 text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">{tagline}</h1>
-      <div className="mt-7 flex flex-wrap gap-3">
+      <h1 className="rise rise-delay-1 mt-4 text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">{tagline}</h1>
+      <div className="rise rise-delay-2 mt-7 flex flex-wrap gap-3">
         <Link
           href={catalogueHref}
-          className="rounded-full px-5 py-3 text-sm font-medium"
+          className="soft rounded-full px-5 py-3 text-sm font-medium"
           style={darkHero ? { background: "#ffffff", color: "#171717" } : { background: "var(--site-primary)", color: "#ffffff" }}
         >
           {category === "RESTAURANT" ? "Voir la carte" : category === "VITRINE" ? "Découvrir" : "Découvrir la boutique"}
         </Link>
         <a
           href="#contact"
-          className="rounded-full border px-5 py-3 text-sm font-medium"
+          className="soft rounded-full border px-5 py-3 text-sm font-medium"
           style={{
             borderColor: darkHero ? "rgba(255,255,255,0.35)" : "var(--site-border)",
             color: darkHero ? "#ffffff" : "inherit",

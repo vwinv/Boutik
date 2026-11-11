@@ -61,6 +61,7 @@ type Order = {
 
 type StatusFilter = "tous" | "PENDING" | "CONFIRMED" | "PREPARING" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
 type PaymentFilter = "tous" | "PAID" | "PENDING" | "COD" | "FAILED";
+type ChannelFilter = "tous" | "whatsapp" | "web";
 
 const STATUS_TABS: Array<{ key: StatusFilter; label: string }> = [
   { key: "tous", label: "Tous" },
@@ -145,6 +146,16 @@ function matchesPaymentFilter(order: Order, filter: PaymentFilter) {
   return order.paymentStatus === filter;
 }
 
+function isWhatsappOrder(order: Order) {
+  return order.paymentMethod === "whatsapp" || (order.note || "").toLowerCase().includes("whatsapp");
+}
+
+function matchesChannelFilter(order: Order, filter: ChannelFilter) {
+  if (filter === "tous") return true;
+  if (filter === "whatsapp") return isWhatsappOrder(order);
+  return !isWhatsappOrder(order);
+}
+
 export function CommandesPage() {
   return (
     <ProShell title="Commandes">
@@ -161,8 +172,15 @@ function CommandesBody() {
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("tous");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("tous");
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("tous");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Order | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const canal = new URLSearchParams(window.location.search).get("canal");
+    if (canal === "whatsapp" || canal === "web") setChannelFilter(canal);
+  }, []);
 
   const load = useCallback(async () => {
     const session = readProSession();
@@ -193,6 +211,7 @@ function CommandesBody() {
     return orders.filter((order) => {
       if (!matchesStatusFilter(order, statusFilter)) return false;
       if (!matchesPaymentFilter(order, paymentFilter)) return false;
+      if (!matchesChannelFilter(order, channelFilter)) return false;
       if (!q) return true;
       return (
         order.number.toLowerCase().includes(q) ||
@@ -201,7 +220,7 @@ function CommandesBody() {
         (order.customerEmail || "").toLowerCase().includes(q)
       );
     });
-  }, [orders, statusFilter, paymentFilter, query]);
+  }, [orders, statusFilter, paymentFilter, channelFilter, query]);
 
   async function setOrderStatus(order: Order, status: OrderStatus) {
     if (!tenantId) return;
@@ -267,6 +286,18 @@ function CommandesBody() {
           ))}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="sm:w-44">
+            <span className="sr-only">Filtrer par canal</span>
+            <select
+              value={channelFilter}
+              onChange={(event) => setChannelFilter(event.target.value as ChannelFilter)}
+              className="w-full rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm outline-none focus:border-neutral-400"
+            >
+              <option value="tous">Canal : Tous</option>
+              <option value="whatsapp">Canal : WhatsApp</option>
+              <option value="web">Canal : Site web</option>
+            </select>
+          </label>
           <label className="sm:w-56">
             <span className="sr-only">Filtrer par paiement</span>
             <select
@@ -321,7 +352,16 @@ function CommandesBody() {
                     className="cursor-pointer border-b border-neutral-50 transition-colors last:border-0 hover:bg-neutral-50/80"
                     onClick={() => setSelected(order)}
                   >
-                    <td className="px-5 py-4 font-medium whitespace-nowrap">{order.number}</td>
+                    <td className="px-5 py-4 font-medium whitespace-nowrap">
+                      <span className="inline-flex items-center gap-2">
+                        {order.number}
+                        {isWhatsappOrder(order) ? (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            WhatsApp
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
                     <td className="px-5 py-4">
                       <p className="font-medium">{order.customerName}</p>
                       <p className="text-xs text-neutral-500">{order.customerPhone}</p>
@@ -400,6 +440,7 @@ function OrderDetailModal({
           <div className="min-w-0">
             <p className="text-sm text-neutral-500">
               {order.number} · {formatOrderDate(order.createdAt)}
+              {isWhatsappOrder(order) ? " · WhatsApp" : ""}
             </p>
             <h2 className="mt-1 truncate text-2xl font-semibold tracking-tight sm:text-3xl">{order.customerName}</h2>
           </div>

@@ -150,12 +150,17 @@ function ProductView({
       </Link>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-2 lg:items-start lg:gap-12">
-        <div>
+        <div className="cover-in">
           <div
-            className="overflow-hidden rounded-[28px]"
+            className="group overflow-hidden rounded-[28px]"
             style={{ background: light ? "var(--site-card)" : "rgba(255,255,255,0.06)" }}
           >
-            <img src={image} alt={product.name} className="aspect-[4/5] w-full object-cover" />
+            <img
+              key={image}
+              src={image}
+              alt={product.name}
+              className="zoom-img aspect-[4/5] w-full object-cover transition-opacity duration-500"
+            />
           </div>
           {showThumbnails ? (
             <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -183,11 +188,11 @@ function ProductView({
         </div>
 
         <div>
-          <p className="text-sm" style={{ color: "var(--site-muted)" }}>
+          <p className="rise text-sm" style={{ color: "var(--site-muted)" }}>
             {categoryLabel} · {refLabel}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{product.name}</h1>
-          <p className="mt-3 text-2xl font-semibold" style={{ color: "var(--site-primary)" }}>
+          <h1 className="rise rise-delay-1 mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{product.name}</h1>
+          <p className="rise rise-delay-2 mt-3 text-2xl font-semibold" style={{ color: "var(--site-primary)" }}>
             {formatPriceXof(priceXof)}
           </p>
           {product.compareAtPriceXof && product.compareAtPriceXof > priceXof ? (
@@ -255,12 +260,12 @@ function ProductView({
             </button>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="rise rise-delay-3 mt-6 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               disabled={!inStock}
               onClick={() => addToCart(false)}
-              className="rounded-full bg-neutral-950 px-5 py-3.5 text-sm font-medium text-white disabled:opacity-40"
+              className="soft rounded-full bg-neutral-950 px-5 py-3.5 text-sm font-medium text-white disabled:opacity-40"
             >
               Ajouter au panier
             </button>
@@ -268,7 +273,7 @@ function ProductView({
               type="button"
               disabled={!inStock}
               onClick={() => addToCart(true)}
-              className="rounded-full px-5 py-3.5 text-sm font-medium text-white disabled:opacity-40"
+              className="soft rounded-full px-5 py-3.5 text-sm font-medium text-white disabled:opacity-40"
               style={{ background: "var(--site-primary)" }}
             >
               Acheter maintenant
@@ -295,12 +300,12 @@ function ProductView({
             {related.map((item) => {
               const thumb = productImage(item.name, item.photos);
               return (
-                <Link key={item.slug} href={storeHref(basePath, `/produit/${item.slug}`)} className="min-w-0 block">
+                <Link key={item.slug} href={storeHref(basePath, `/produit/${item.slug}`)} className="product-lift group min-w-0 block">
                   <div
                     className="overflow-hidden rounded-[22px]"
                     style={{ background: light ? "var(--site-card)" : "rgba(255,255,255,0.06)" }}
                   >
-                    <img src={thumb} alt="" className="aspect-[4/5] w-full object-cover" />
+                    <img src={thumb} alt="" className="zoom-img aspect-[4/5] w-full object-cover" />
                   </div>
                   <h3 className="mt-3 truncate text-sm font-semibold">{item.name}</h3>
                   <p className="mt-1 text-sm font-semibold" style={{ color: "var(--site-primary)" }}>

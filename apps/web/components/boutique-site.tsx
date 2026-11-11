@@ -9,6 +9,7 @@ import { formatPriceXof, isLightLayout, productImage, resolveLayout, themeStyle 
 import { storeHref } from "../lib/store-paths";
 import { CartProvider, useCart } from "./boutique/cart-context";
 import { CoverImage } from "./boutique/cover-image";
+import { Reveal } from "./boutique/reveal";
 
 export function BoutiqueSite({
   tenant,
@@ -273,13 +274,13 @@ function BoutiqueSiteInner({
         <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:py-16">
           {layout === "atelier" || layout === "minimal" ? (
             <>
-              <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
+              <CoverImage src={cover} className="cover-in h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
               <HeroCopy city={city} tagline={tagline} category={tenant.category} layout={layout} />
             </>
           ) : (
             <>
               <HeroCopy city={city} tagline={tagline} category={tenant.category} layout={layout} />
-              <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
+              <CoverImage src={cover} className="cover-in h-72 w-full rounded-[28px] object-cover sm:h-[22rem]" />
             </>
           )}
         </div>
@@ -287,28 +288,36 @@ function BoutiqueSiteInner({
 
       {featuredVisible && featured.length ? (
         <section id="mis-en-avant" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{featuredLabel}</h2>
+          <Reveal>
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{featuredLabel}</h2>
+          </Reveal>
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {featured.map((product) => (
-              <ProductCard key={product.slug} product={product} href={productHref(product.slug)} />
+            {featured.map((product, index) => (
+              <Reveal key={product.slug} delay={index * 70}>
+                <ProductCard product={product} href={productHref(product.slug)} />
+              </Reveal>
             ))}
           </div>
         </section>
       ) : null}
 
       <section id="boutique" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{catalogLabel}</h2>
-          <Link
-            href={storeHref(basePath, "/catalogue")}
-            className="rounded-full bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white"
-          >
-            Tous les produits
-          </Link>
-        </div>
+        <Reveal>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{catalogLabel}</h2>
+            <Link
+              href={storeHref(basePath, "/catalogue")}
+              className="soft rounded-full bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              Tous les produits
+            </Link>
+          </div>
+        </Reveal>
         <div className="mt-8 grid grid-cols-2 gap-5 lg:grid-cols-4">
-          {products.slice(0, 4).map((product) => (
-            <ProductCard key={product.slug} product={product} href={productHref(product.slug)} />
+          {products.slice(0, 4).map((product, index) => (
+            <Reveal key={product.slug} delay={index * 70}>
+              <ProductCard product={product} href={productHref(product.slug)} />
+            </Reveal>
           ))}
         </div>
         {!products.length ? (
@@ -320,39 +329,46 @@ function BoutiqueSiteInner({
 
       {promotionsVisible ? (
         <section id="promotions" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <div
-            className="rounded-[28px] px-6 py-8 sm:px-8"
-            style={{ background: "var(--site-hero)", color: "var(--site-hero-fg)" }}
-          >
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{promotionsTitle}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed" style={{ color: "var(--site-hero-muted)" }}>
-              {promotionsBody || "Découvrez nos offres du moment."}
-            </p>
-            {promoProducts.length ? (
-              <div className="mt-8 grid grid-cols-2 gap-5 lg:grid-cols-4">
-                {promoProducts.map((product) => (
-                  <ProductCard key={product.slug} product={product} href={productHref(product.slug)} />
-                ))}
-              </div>
-            ) : null}
-          </div>
+          <Reveal>
+            <div
+              className="rounded-[28px] px-6 py-8 sm:px-8"
+              style={{ background: "var(--site-hero)", color: "var(--site-hero-fg)" }}
+            >
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{promotionsTitle}</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed" style={{ color: "var(--site-hero-muted)" }}>
+                {promotionsBody || "Découvrez nos offres du moment."}
+              </p>
+              {promoProducts.length ? (
+                <div className="mt-8 grid grid-cols-2 gap-5 lg:grid-cols-4">
+                  {promoProducts.map((product) => (
+                    <ProductCard key={product.slug} product={product} href={productHref(product.slug)} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </Reveal>
         </section>
       ) : null}
 
       {aboutVisible ? (
         <section id="apropos" className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 lg:grid-cols-2">
-          <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-80" />
-          <div>
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{aboutTitle}</h2>
-            <p className="mt-4 text-base leading-relaxed" style={{ color: "var(--site-muted)" }}>
-              {aboutText}
-            </p>
-          </div>
+          <Reveal>
+            <CoverImage src={cover} className="h-72 w-full rounded-[28px] object-cover sm:h-80" />
+          </Reveal>
+          <Reveal delay={120}>
+            <div>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{aboutTitle}</h2>
+              <p className="mt-4 text-base leading-relaxed" style={{ color: "var(--site-muted)" }}>
+                {aboutText}
+              </p>
+            </div>
+          </Reveal>
         </section>
       ) : null}
 
       {contactVisible ? (
       <section id="contact" className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+        <Reveal>
         <div className="rounded-[28px] px-6 py-8 sm:px-8" style={{ background: "var(--site-card)" }}>
           <h2 className="text-3xl font-semibold tracking-tight">{contactTitle}</h2>
           <dl className="mt-6 space-y-3 text-sm">
@@ -379,7 +395,7 @@ function BoutiqueSiteInner({
             {phone ? (
               <a
                 href={`tel:${phone.replace(/\s+/g, "")}`}
-                className="rounded-full px-4 py-2 text-sm font-medium"
+                className="soft rounded-full px-4 py-2 text-sm font-medium"
                 style={contactActionStyle(light)}
               >
                 Appeler
@@ -388,14 +404,14 @@ function BoutiqueSiteInner({
             {phone ? (
               <a
                 href={`https://wa.me/${phone.replace(/[^\d]/g, "")}`}
-                className="rounded-full px-4 py-2 text-sm font-medium"
+                className="soft rounded-full px-4 py-2 text-sm font-medium"
                 style={contactActionStyle(light)}
               >
                 WhatsApp
               </a>
             ) : null}
             {email ? (
-              <a href={`mailto:${email}`} className="rounded-full px-4 py-2 text-sm font-medium" style={contactActionStyle(light)}>
+              <a href={`mailto:${email}`} className="soft rounded-full px-4 py-2 text-sm font-medium" style={contactActionStyle(light)}>
                 Email
               </a>
             ) : null}
@@ -404,7 +420,7 @@ function BoutiqueSiteInner({
                 href={mapsHref}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-full px-4 py-2 text-sm font-medium"
+                className="soft rounded-full px-4 py-2 text-sm font-medium"
                 style={contactActionStyle(light)}
               >
                 Itinéraire
@@ -412,13 +428,14 @@ function BoutiqueSiteInner({
             ) : null}
             <a
               href={email ? `mailto:${email}` : "#contact"}
-              className="rounded-full px-4 py-2 text-sm font-medium text-white"
+              className="soft rounded-full px-4 py-2 text-sm font-medium text-white"
               style={{ background: "var(--site-primary)" }}
             >
               Nous écrire
             </a>
           </div>
         </div>
+        </Reveal>
       </section>
       ) : null}
 
@@ -502,14 +519,14 @@ function HeroCopy({
     category === "RESTAURANT" ? `RESTAURANT · ${city.toUpperCase()}` : category === "VITRINE" ? `SITE · ${city.toUpperCase()}` : `BOUTIQUE · ${city.toUpperCase()}`;
   return (
     <div>
-      <p className="text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--site-hero-muted)" }}>
+      <p className="rise text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--site-hero-muted)" }}>
         {eyebrow}
       </p>
-      <h1 className="mt-4 text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">{tagline}</h1>
-      <div className="mt-7 flex flex-wrap gap-3">
+      <h1 className="rise rise-delay-1 mt-4 text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">{tagline}</h1>
+      <div className="rise rise-delay-2 mt-7 flex flex-wrap gap-3">
         <a
           href="#boutique"
-          className="rounded-full px-5 py-3 text-sm font-medium"
+          className="soft rounded-full px-5 py-3 text-sm font-medium"
           style={
             darkHero
               ? { background: "#ffffff", color: "#171717" }
@@ -520,7 +537,7 @@ function HeroCopy({
         </a>
         <a
           href="#contact"
-          className="rounded-full border px-5 py-3 text-sm font-medium"
+          className="soft rounded-full border px-5 py-3 text-sm font-medium"
           style={{
             borderColor: darkHero ? "rgba(255,255,255,0.35)" : "var(--site-border)",
             color: darkHero ? "#ffffff" : "inherit",
@@ -538,9 +555,9 @@ function ProductCard({ product, href }: { product: StorefrontProduct; href: stri
   const promo = Boolean(product.compareAtPriceXof && product.compareAtPriceXof > product.priceXof);
   const rupture = product.availability === "OUT_OF_STOCK";
   return (
-    <Link href={href} className="min-w-0 block">
+    <Link href={href} className="product-lift group min-w-0 block">
       <div className="relative overflow-hidden rounded-[22px]" style={{ background: "var(--site-card)" }}>
-        <img src={image} alt="" className="aspect-[4/5] w-full object-cover" />
+        <img src={image} alt="" className="zoom-img aspect-[4/5] w-full object-cover" />
         {promo ? (
           <span
             className="absolute top-3 left-3 rounded-full px-2.5 py-1 text-[11px] font-medium text-white"
