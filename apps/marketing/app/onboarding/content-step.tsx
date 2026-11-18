@@ -246,7 +246,7 @@ export function ContentStep({
           onClick={onContinue}
           className="soft flex items-center gap-2 rounded-full bg-neutral-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
         >
-          Continuer
+          {draft.items.length === 0 ? "Passer" : "Continuer"}
           <span aria-hidden="true">→</span>
         </button>
       </div>

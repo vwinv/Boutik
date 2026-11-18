@@ -36,9 +36,9 @@ const nextConfig: NextConfig = {
 
     return [
       { source: "/api/:path*", destination: `http://localhost:${ports.api}/api/:path*` },
-      { source: "/admin", destination: `http://localhost:${ports.admin}/admin` },
+      { source: "/admin", destination: `http://localhost:${ports.admin}/admin` }, //https://boutik-peach.vercel.app/admin
       { source: "/admin/:path*", destination: `http://localhost:${ports.admin}/admin/:path*` },
-      { source: "/app", destination: `http://localhost:${ports.app}/app` },
+      { source: "/app", destination: `http://localhost:${ports.app}/app` },//https://boutik-81i8.vercel.app/
       { source: "/app/:path*", destination: `http://localhost:${ports.app}/app/:path*` },
     ];
   },

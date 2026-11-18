@@ -8,7 +8,11 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Site public — Boutik",
+  title: {
+    default: "Boutique",
+    template: "%s",
+  },
+  description: "Boutique en ligne",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

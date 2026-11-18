@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { workspaceAuthUrl } from "@boutik/domain";
+import { withBoutikAuthHash } from "@boutik/domain";
 import { storeResume, storeSession, type OnboardingResume } from "../onboarding/resume";
 
 const DEMO_EMAIL = "marie@marie.local";
 const DEMO_PASSWORD = "changeme";
+const LOGIN_TIMEOUT_MS = 20_000;
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,11 @@ export function LoginForm() {
     try {
       const data = await postLogin({ email: email.trim(), password });
       storeSession(data.accessToken, data.refreshToken);
+      const session = {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      };
+
       if (data.resume) {
         storeResume(data.resume);
         window.location.assign("/onboarding");
@@ -29,29 +35,15 @@ export function LoginForm() {
       // Retour explicite (ex. tunnel HTTPS → /app/whatsapp) : rester sur la même origine.
       const nextParam = new URLSearchParams(window.location.search).get("next");
       if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
-        const payload = encodeURIComponent(
-          JSON.stringify({
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-          }),
-        );
-        window.location.assign(`${nextParam}#boutik_auth=${payload}`);
+        window.location.assign(withBoutikAuthHash(nextParam, session));
         return;
       }
 
-      const slug = resolveWorkspaceSlug(data.user);
-      if (!slug) {
-        window.location.assign("/app");
-        return;
-      }
-      window.location.assign(
-        workspaceAuthUrl(slug, {
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-        }),
-      );
+      // Toujours /app sur l’origine plateforme (évite admin.{slug}… inaccessible sur Vercel).
+      window.location.assign(withBoutikAuthHash(`${window.location.origin}/app`, session));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Une erreur est survenue.");
+    } finally {
       setPending(false);
     }
   }
@@ -156,16 +148,15 @@ export function LoginForm() {
 }
 
 async function postLogin(body: { email: string; password: string }) {
-  let response: Response;
-  try {
-    response = await fetch("/api/auth/pro/login", {
+  const response = await fetchWithTimeout(
+    "/api/auth/pro/login",
+    {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
-  } catch {
-    throw new Error("Le serveur ne répond pas.");
-  }
+    },
+    LOGIN_TIMEOUT_MS,
+  );
   const raw = await response.text();
   let payload: {
     ok?: boolean;
@@ -190,20 +181,22 @@ async function postLogin(body: { email: string; password: string }) {
     );
   }
   if (!payload.ok || !payload.data) {
-    throw new Error(payload.error?.message || "Une erreur est survenue.");
+    throw new Error(payload.error?.message || "Email ou mot de passe incorrect.");
   }
   return payload.data;
 }
 
-function resolveWorkspaceSlug(user?: {
-  tenantId?: string | null;
-  memberships?: Array<{ tenantId: string; slug: string; status?: string }>;
-}) {
-  const memberships = (user?.memberships || []).filter((item) => item.status !== "ARCHIVED");
-  if (!memberships.length) return null;
-  if (user?.tenantId) {
-    const current = memberships.find((item) => item.tenantId === user.tenantId);
-    if (current?.slug) return current.slug;
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Délai dépassé. Vérifiez votre connexion ou réessayez.");
+    }
+    throw new Error("Le serveur ne répond pas. Réessaie dans un instant.");
+  } finally {
+    window.clearTimeout(timer);
   }
-  return memberships[0]?.slug || null;
 }

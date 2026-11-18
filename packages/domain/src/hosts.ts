@@ -138,8 +138,9 @@ export function whatsappEmbeddedConnectUrl(path = "/app/whatsapp", origin = publ
 export function withBoutikAuthHash(
   targetUrl: string,
   session: { accessToken: string; refreshToken: string },
+  base = typeof window !== "undefined" ? window.location.origin : publicOrigin(),
 ) {
-  const url = new URL(targetUrl);
+  const url = new URL(targetUrl, base);
   url.hash = `boutik_auth=${encodeURIComponent(
     JSON.stringify({
       accessToken: session.accessToken,

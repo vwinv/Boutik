@@ -83,7 +83,7 @@ export function TemplateStep({
         <div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {TEMPLATES.map((item) => {
-              const selected = draft.templateId === item.id && draft.applied;
+              const selected = draft.templateId === item.id;
               const light = item.id === "eclat" || item.id === "minimal" || item.id === "atelier";
               return (
                 <button

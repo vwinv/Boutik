@@ -7,7 +7,11 @@ const nextConfig: NextConfig = {
     PUBLIC_ORIGIN: process.env.PUBLIC_ORIGIN ?? "http://localhost:3000",
   },
   async rewrites() {
-    if (process.env.NODE_ENV === "production") return [];
+    if (process.env.NODE_ENV === "production") {
+      const api = process.env.API_URL?.replace(/\/$/, "");
+      if (!api) return [];
+      return [{ source: "/api/:path*", destination: `${api}/api/:path*` }];
+    }
     return [{ source: "/api/:path*", destination: `http://localhost:${ports.api}/api/:path*` }];
   },
 };

@@ -1,6 +1,5 @@
 import {
   ArrayMaxSize,
-  ArrayMinSize,
   IsArray,
   IsEmail,
   IsIn,
@@ -218,11 +217,10 @@ export class OnboardingContentDto {
   email: string;
 
   @IsArray()
-  @ArrayMinSize(1, { message: "Ajoutez au moins un élément" })
   @ArrayMaxSize(40)
   @ValidateNested({ each: true })
   @Type(() => OnboardingContentItemDto)
-  items: OnboardingContentItemDto[];
+  items: OnboardingContentItemDto[] = [];
 }
 
 export class OnboardingPreviewDto {

@@ -21,6 +21,7 @@ export function LoginView({ onSuccess }: { onSuccess: () => void }) {
       onSuccess();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Une erreur est survenue.");
+    } finally {
       setPending(false);
     }
   }

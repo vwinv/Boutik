@@ -69,6 +69,12 @@ export type TenantSitePublic = {
     linkedinUrl?: string | null;
     xUrl?: string | null;
   };
+  seo?: {
+    title: string | null;
+    description: string | null;
+    keywords: string | null;
+    ogImageUrl: string | null;
+  };
   hours: Array<{
     weekday: number;
     opensAt: string | null;

@@ -1,4 +1,5 @@
 const AUTH_KEY = "boutik.staff.auth";
+const LOGIN_TIMEOUT_MS = 20_000;
 
 export type StaffSession = {
   accessToken: string;
@@ -37,11 +38,15 @@ export function clearStaffSession() {
 }
 
 export async function staffLogin(email: string, password: string) {
-  const response = await fetch("/api/auth/staff/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
+  const response = await fetchWithTimeout(
+    "/api/auth/staff/login",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+    LOGIN_TIMEOUT_MS,
+  );
   const raw = await response.text();
   let body: {
     ok?: boolean;
@@ -58,7 +63,7 @@ export async function staffLogin(email: string, password: string) {
     );
   }
   if (!body.ok || !body.data?.accessToken || !body.data?.refreshToken) {
-    throw new Error(body.error?.message || "Identifiants incorrects.");
+    throw new Error(body.error?.message || "Email ou mot de passe incorrect.");
   }
   writeStaffSession({
     accessToken: body.data.accessToken,
@@ -70,9 +75,13 @@ export async function staffLogin(email: string, password: string) {
 export async function fetchStaffMe(): Promise<StaffUser> {
   const session = readStaffSession();
   if (!session) throw new Error("Non connecté");
-  const response = await fetch("/api/auth/me", {
-    headers: { Authorization: `Bearer ${session.accessToken}` },
-  });
+  const response = await fetchWithTimeout(
+    "/api/auth/me",
+    {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    },
+    LOGIN_TIMEOUT_MS,
+  );
   const raw = await response.text();
   let body: { ok?: boolean; data?: StaffUser; error?: { message?: string } } = {};
   try {
@@ -85,4 +94,19 @@ export async function fetchStaffMe(): Promise<StaffUser> {
     throw new Error(body.error?.message || "Session expirée.");
   }
   return body.data;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Délai dépassé. Vérifiez votre connexion ou réessayez.");
+    }
+    throw new Error("Le serveur ne répond pas. Réessaie dans un instant.");
+  } finally {
+    window.clearTimeout(timer);
+  }
 }

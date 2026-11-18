@@ -24,7 +24,8 @@ export function getApiUrl() {
 }
 
 export function getApiPort() {
-  const raw = process.env.API_PORT;
+  // Render/Railway injectent PORT ; API_PORT reste pour le local.
+  const raw = process.env.PORT || process.env.API_PORT;
   return raw ? Number(raw) : ports.api;
 }
 

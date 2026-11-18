@@ -127,6 +127,8 @@ export function Onboarding() {
   const [formError, setFormError] = useState<string | null>(null);
   const [contractOpen, setContractOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  /** Séparé de `pending` : sinon « Envoyer par mail » affiche « Vérification… » sur le bouton principal. */
+  const [otpBusy, setOtpBusy] = useState<"sms" | "email" | "verify" | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [accountCreated, setAccountCreated] = useState(false);
 
@@ -200,11 +202,13 @@ export function Onboarding() {
     if (savedTemplate) {
       try {
         const saved = JSON.parse(savedTemplate) as Partial<TemplateDraft>;
+        const templateId = saved.templateId ?? "eclat";
         setTemplate({
-          templateId: saved.templateId ?? "eclat",
+          templateId,
           primary: saved.primary ?? emptyTemplate.primary,
           secondary: saved.secondary ?? emptyTemplate.secondary,
-          applied: Boolean(saved.applied),
+          // Anciens brouillons : un templateId suffit, pas besoin de recliquer.
+          applied: saved.applied === false ? true : Boolean(saved.applied ?? true),
         });
       } catch {
         window.localStorage.removeItem(TEMPLATE_KEY);
@@ -407,7 +411,8 @@ export function Onboarding() {
   }
 
   async function resend(channel: "sms" | "email") {
-    setPending(true);
+    if (otpBusy) return;
+    setOtpBusy(channel);
     setFormError(null);
     setNotice(null);
     try {
@@ -428,17 +433,18 @@ export function Onboarding() {
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Une erreur est survenue.");
     } finally {
-      setPending(false);
+      setOtpBusy(null);
     }
   }
 
   async function verify(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (otpBusy) return;
     if (code.length !== 6) {
       setFormError("Saisissez le code à 6 chiffres.");
       return;
     }
-    setPending(true);
+    setOtpBusy("verify");
     setFormError(null);
     try {
       const raw = window.sessionStorage.getItem(VERIFY_KEY);
@@ -456,7 +462,7 @@ export function Onboarding() {
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Une erreur est survenue.");
     } finally {
-      setPending(false);
+      setOtpBusy(null);
     }
   }
 
@@ -584,9 +590,9 @@ export function Onboarding() {
   }
 
   async function continueTemplate() {
+    const chosen = template.templateId || "eclat";
     if (!template.applied) {
-      setFormError("Choisissez un modèle pour continuer.");
-      return;
+      setTemplate((current) => ({ ...current, templateId: chosen, applied: true }));
     }
     const raw = window.sessionStorage.getItem(VERIFY_KEY);
     const session = raw ? (JSON.parse(raw) as VerifySession) : null;
@@ -596,7 +602,7 @@ export function Onboarding() {
     try {
       await postAuth("onboarding/template", {
         email,
-        templateId: template.templateId,
+        templateId: chosen,
         primary: template.primary,
         secondary: template.secondary,
       });
@@ -612,10 +618,6 @@ export function Onboarding() {
   }
 
   async function continueContent() {
-    if (content.items.length === 0) {
-      setFormError(contentCopy(category).emptyError);
-      return;
-    }
     const raw = window.sessionStorage.getItem(VERIFY_KEY);
     const session = raw ? (JSON.parse(raw) as VerifySession) : null;
     const email = (session?.email || fields.email).trim();
@@ -947,7 +949,7 @@ export function Onboarding() {
               debugCode={debugCode}
               notice={notice}
               error={formError}
-              pending={pending}
+              otpBusy={otpBusy}
               confirmed={confirmed}
               resumed={accountCreated}
               onCode={setCode}
@@ -1768,7 +1770,7 @@ function PhoneStep({
   debugCode,
   notice,
   error,
-  pending,
+  otpBusy,
   confirmed,
   resumed,
   onCode,
@@ -1783,7 +1785,7 @@ function PhoneStep({
   debugCode: string | null;
   notice: string | null;
   error: string | null;
-  pending: boolean;
+  otpBusy: "sms" | "email" | "verify" | null;
   confirmed: boolean;
   resumed: boolean;
   onCode: (value: string) => void;
@@ -1792,6 +1794,8 @@ function PhoneStep({
   onBack: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const sending = otpBusy === "sms" || otpBusy === "email";
+  const verifying = otpBusy === "verify";
   return (
     <>
       <div className="pr-0 sm:max-w-xl sm:pr-44">
@@ -1838,20 +1842,20 @@ function PhoneStep({
           {debugCode ? <span aria-hidden="true">·</span> : null}
           <button
             type="button"
-            disabled={pending || confirmed}
+            disabled={Boolean(otpBusy) || confirmed}
             onClick={onResend}
             className="font-medium text-neutral-950 underline-offset-2 hover:underline disabled:opacity-50"
           >
-            Renvoyer le code
+            {otpBusy === "sms" ? "Envoi SMS…" : "Renvoyer le code"}
           </button>
           <span aria-hidden="true">·</span>
           <button
             type="button"
-            disabled={pending || confirmed}
+            disabled={Boolean(otpBusy) || confirmed}
             onClick={onEmail}
             className="font-medium text-neutral-950 underline-offset-2 hover:underline disabled:opacity-50"
           >
-            Envoyer le code par mail
+            {otpBusy === "email" ? "Envoi du mail…" : "Envoyer le code par mail"}
           </button>
         </p>
         {notice ? <p className="mt-2 text-sm text-neutral-700">{notice}</p> : null}
@@ -1864,17 +1868,18 @@ function PhoneStep({
             <button
               type="button"
               onClick={onBack}
-              className="soft rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800"
+              disabled={sending || verifying}
+              className="soft rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 disabled:opacity-50"
             >
               ← Retour
             </button>
           )}
           <button
             type="submit"
-            disabled={pending || confirmed}
+            disabled={verifying || confirmed || sending}
             className="soft flex items-center gap-2 rounded-full bg-neutral-950 px-5 py-3 text-sm font-medium text-white disabled:opacity-60"
           >
-            {confirmed ? "Téléphone confirmé" : pending ? "Vérification…" : "Vérifier le code"}
+            {confirmed ? "Téléphone confirmé" : verifying ? "Vérification…" : "Vérifier le code"}
             {confirmed ? null : <span aria-hidden="true">→</span>}
           </button>
         </div>

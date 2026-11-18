@@ -40,7 +40,7 @@ export function contentCopy(category: "BOUTIQUE" | "RESTAURANT" | "VITRINE") {
   if (category === "RESTAURANT") {
     return {
       title: "Ajoutez vos premiers plats",
-      subtitle: "Ajoutez au moins un plat pour continuer. Vous pourrez enrichir le menu ensuite.",
+      subtitle: "Optionnel : vous pourrez enrichir le menu après publication.",
       nameLabel: "Nom du plat",
       priceLabel: "Prix (FCFA)",
       photoLabel: "Photo",
@@ -53,7 +53,7 @@ export function contentCopy(category: "BOUTIQUE" | "RESTAURANT" | "VITRINE") {
   if (category === "VITRINE") {
     return {
       title: "Ajoutez vos premiers services",
-      subtitle: "Ajoutez au moins un service pour continuer. Vous pourrez les modifier ensuite.",
+      subtitle: "Optionnel : vous pourrez les modifier après publication.",
       nameLabel: "Nom du service",
       priceLabel: "Prix (FCFA)",
       photoLabel: "Photo",
@@ -65,7 +65,7 @@ export function contentCopy(category: "BOUTIQUE" | "RESTAURANT" | "VITRINE") {
   }
   return {
     title: "Ajoutez vos premiers produits",
-    subtitle: "Ajoutez au moins un produit pour continuer. Vous pourrez enrichir le catalogue ensuite.",
+    subtitle: "Optionnel : vous pourrez enrichir le catalogue après publication.",
     nameLabel: "Nom du produit",
     priceLabel: "Prix (FCFA)",
     photoLabel: "Photo",

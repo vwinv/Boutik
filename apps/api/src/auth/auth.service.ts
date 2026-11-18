@@ -535,11 +535,8 @@ export class AuthService {
     if (!previous.theme?.templateId) {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Choisissez un modèle avant de continuer");
     }
-    if (!input.items.length) {
-      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Ajoutez au moins un élément");
-    }
     const content: OnboardingContent = {
-      items: input.items.map((item) => ({
+      items: (input.items ?? []).map((item) => ({
         name: item.name.trim(),
         priceXof: item.priceXof,
         tag: item.tag?.trim() || undefined,
@@ -562,15 +559,17 @@ export class AuthService {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Confirmez votre téléphone avant de continuer");
     }
     const previous = readOnboardingProfile(user.onboardingProfile);
-    if (!previous.content?.items?.length) {
-      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Ajoutez du contenu avant de continuer");
+    if (!previous.theme?.templateId) {
+      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Choisissez un modèle avant de continuer");
     }
+    // Contenu catalogue optionnel à l’onboarding.
+    const content = previous.content ?? { items: [], savedAt: new Date().toISOString() };
     const previewedAt = new Date().toISOString();
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         onboardingProfile: JSON.parse(
-          JSON.stringify({ ...previous, previewedAt }),
+          JSON.stringify({ ...previous, content, previewedAt }),
         ) as Prisma.InputJsonValue,
       },
     });
@@ -586,8 +585,8 @@ export class AuthService {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Choisissez une activité avant de publier");
     }
     const previous = readOnboardingProfile(user.onboardingProfile);
-    if (!previous.businessName || !previous.content?.items?.length) {
-      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Complétez le contenu avant de publier");
+    if (!previous.businessName) {
+      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Complétez les informations de votre activité avant de publier");
     }
     if (!previous.theme?.templateId) {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Choisissez un modèle avant de publier");

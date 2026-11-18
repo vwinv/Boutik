@@ -11,7 +11,8 @@ export const emptyTemplate: TemplateDraft = {
   templateId: "eclat",
   primary: "#6b4c9a",
   secondary: "#111111",
-  applied: false,
+  // Pré-appliqué : le commerçant peut continuer sans recliquer sur le modèle par défaut.
+  applied: true,
 };
 
 export const TEMPLATES: {

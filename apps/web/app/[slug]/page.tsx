@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { fetchStorefrontCatalog, fetchTenantBySlug, type StorefrontCatalog } from "@boutik/sdk";
 import { BoutiqueSite } from "../../components/boutique-site";
 import { MaintenancePage } from "../../components/maintenance-page";
 import { isPublicSiteInMaintenance } from "../../lib/maintenance";
+import { localBusinessJsonLd, storefrontMetadata } from "../../lib/seo";
 import { publicBasePath, requestHost } from "../../lib/store-paths";
 
 type PageProps = {
@@ -12,6 +14,18 @@ type PageProps = {
 
 function emptyCatalog(slug: string, currency: string): StorefrontCatalog {
   return { slug, currency, categories: [], products: [] };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const tenant = await fetchTenantBySlug(slug);
+  if (!tenant) return { title: "Boutique introuvable" };
+  const basePath = publicBasePath(slug, requestHost(await headers()));
+  return storefrontMetadata({
+    tenant,
+    basePath,
+    noIndex: isPublicSiteInMaintenance(tenant),
+  });
 }
 
 export default async function PublicSitePage({ params }: PageProps) {
@@ -35,6 +49,12 @@ export default async function PublicSitePage({ params }: PageProps) {
 
   const host = requestHost(await headers());
   const basePath = publicBasePath(slug, host);
+  const jsonLd = localBusinessJsonLd(tenant, basePath);
 
-  return <BoutiqueSite tenant={tenant} catalog={catalog} basePath={basePath} />;
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <BoutiqueSite tenant={tenant} catalog={catalog} basePath={basePath} />
+    </>
+  );
 }

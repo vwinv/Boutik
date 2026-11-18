@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { proApi, proUpload } from "../lib/api";
 import { activeProMembership, fetchProMe, readProSession } from "../lib/auth";
 import {
@@ -33,6 +33,12 @@ type SiteData = {
     logoUrl: string | null;
     coverUrl: string | null;
   };
+  seo?: {
+    title: string | null;
+    description: string | null;
+    keywords: string | null;
+    ogImageUrl: string | null;
+  };
 };
 
 type Viewport = "desktop" | "mobile";
@@ -54,6 +60,9 @@ function PersonnalisationBody() {
   const [layoutKey, setLayoutKey] = useState<LayoutKey>("eclat");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,6 +120,32 @@ function PersonnalisationBody() {
     setLayoutKey(resolveLayoutKey(data.theme.layoutKey));
     setLogoUrl(data.theme.logoUrl);
     setCoverUrl(data.theme.coverUrl);
+    setSeoTitle(data.seo?.title || "");
+    setSeoDescription(data.seo?.description || "");
+    setSeoKeywords(data.seo?.keywords || "");
+  }
+
+  async function saveSeo(event: FormEvent) {
+    event.preventDefault();
+    if (!tenantId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await proApi<SiteData>(`/api/workspaces/${tenantId}/site/seo`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          seoTitle: seoTitle.trim() || null,
+          seoDescription: seoDescription.trim() || null,
+          seoKeywords: seoKeywords.trim() || null,
+        }),
+      });
+      applySite(updated);
+      setToast("Référencement enregistré");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Impossible d’enregistrer le SEO.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function patchTheme(partial: {
@@ -325,6 +360,53 @@ function PersonnalisationBody() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="rounded-[24px] bg-white p-5 sm:p-6">
+            <h2 className="text-base font-semibold tracking-tight">Référencement (SEO)</h2>
+            <p className="mt-1 text-sm text-neutral-500">
+              Titre et description affichés sur Google et au partage WhatsApp / Facebook.
+            </p>
+            <form className="mt-4 space-y-3" onSubmit={(event) => void saveSeo(event)}>
+              <label className="block text-sm">
+                <span className="text-neutral-500">Titre SEO</span>
+                <input
+                  value={seoTitle}
+                  onChange={(event) => setSeoTitle(event.target.value)}
+                  maxLength={80}
+                  placeholder={title || "Nom de la boutique"}
+                  className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-500">Description</span>
+                <textarea
+                  value={seoDescription}
+                  onChange={(event) => setSeoDescription(event.target.value)}
+                  maxLength={200}
+                  rows={3}
+                  placeholder="Une phrase claire sur votre boutique…"
+                  className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-neutral-500">Mots-clés (optionnel)</span>
+                <input
+                  value={seoKeywords}
+                  onChange={(event) => setSeoKeywords(event.target.value)}
+                  maxLength={200}
+                  placeholder="mode, abidjan, artisanat"
+                  className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-full bg-neutral-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Enregistrer le SEO
+              </button>
+            </form>
           </section>
 
           <section className="rounded-[24px] bg-white p-5 sm:p-6">
