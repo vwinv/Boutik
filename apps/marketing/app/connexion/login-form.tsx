@@ -34,13 +34,14 @@ export function LoginForm() {
 
       // Retour explicite (ex. tunnel HTTPS → /app/whatsapp) : rester sur la même origine.
       const nextParam = new URLSearchParams(window.location.search).get("next");
+      const origin = window.location.origin;
       if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
-        window.location.assign(withBoutikAuthHash(nextParam, session));
+        window.location.assign(withBoutikAuthHash(nextParam, session, origin));
         return;
       }
 
       // Toujours /app sur l’origine plateforme (évite admin.{slug}… inaccessible sur Vercel).
-      window.location.assign(withBoutikAuthHash(`${window.location.origin}/app`, session));
+      window.location.assign(withBoutikAuthHash(`${origin}/app`, session, origin));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Une erreur est survenue.");
     } finally {
