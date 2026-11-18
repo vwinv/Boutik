@@ -42,6 +42,17 @@ const CATALOGUE: NavItem[] = [
   { href: "/modules", label: "Modules" },
 ];
 
+/** Survit aux remounts de navigation pour éviter le flash « Chargement… » entre onglets. */
+let cachedStaffUser: StaffUser | null = null;
+
+function initialAuthState(): { ready: boolean; user: StaffUser | null } {
+  if (typeof window === "undefined") return { ready: false, user: null };
+  const session = readStaffSession();
+  if (!session) return { ready: true, user: null };
+  if (cachedStaffUser) return { ready: true, user: cachedStaffUser };
+  return { ready: false, user: null };
+}
+
 export function AdminShell({
   children,
   title,
@@ -54,8 +65,8 @@ export function AdminShell({
   headerRight?: ReactNode;
 }) {
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<StaffUser | null>(null);
+  const [ready, setReady] = useState(() => initialAuthState().ready);
+  const [user, setUser] = useState<StaffUser | null>(() => initialAuthState().user);
   const [badges, setBadges] = useState<Badges>({
     professionnels: 0,
     support: 0,
@@ -66,6 +77,7 @@ export function AdminShell({
   const bootstrap = useCallback(async () => {
     const session = readStaffSession();
     if (!session) {
+      cachedStaffUser = null;
       setUser(null);
       setReady(true);
       return;
@@ -74,12 +86,15 @@ export function AdminShell({
       const me = await fetchStaffMe();
       if (!me.staffRole || me.staffRole === "NONE") {
         clearStaffSession();
+        cachedStaffUser = null;
         setUser(null);
       } else {
+        cachedStaffUser = me;
         setUser(me);
       }
     } catch {
       clearStaffSession();
+      cachedStaffUser = null;
       setUser(null);
     } finally {
       setReady(true);
@@ -157,6 +172,7 @@ export function AdminShell({
               type="button"
               onClick={() => {
                 clearStaffSession();
+                cachedStaffUser = null;
                 setUser(null);
               }}
               className="mt-3 w-full rounded-xl px-3 py-2 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white"
