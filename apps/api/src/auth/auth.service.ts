@@ -48,14 +48,15 @@ export class AuthService {
     const user = await this.createUser(input);
     if (!user.phone) {
       const verificationToken = await this.issueVerification(user.id, "EMAIL_VERIFY");
-      await this.notifications.sendEmailVerification(user.email, verificationToken);
+      // Ne pas bloquer la réponse HTTP sur SMTP (souvent lent / timeout en prod).
+      void this.notifications.sendEmailVerification(user.email, verificationToken);
       return this.registrationPayload(user, verificationToken);
     }
 
     const code = newPhoneCode();
     await this.storeVerification(user.id, "PHONE_VERIFY", code, 15);
-    this.notifications.sendPhoneVerification(user.phone, code);
-    await this.notifications.sendVerificationCodeEmail(user.email, code);
+    void this.notifications.sendPhoneVerification(user.phone, code);
+    void this.notifications.sendVerificationCodeEmail(user.email, code);
     const payload = { user: presentUserRecord(user) };
     return isProduction() ? payload : { ...payload, debugCode: code };
   }
@@ -309,7 +310,7 @@ export class AuthService {
     if (!active?.otp) {
       await this.storeVerification(user.id, "PHONE_VERIFY", code, 15);
     }
-    await this.notifications.sendPhoneCodeByEmail(user.email, code);
+    void this.notifications.sendPhoneCodeByEmail(user.email, code);
     return isProduction() ? { sent: true } : { sent: true, debugCode: code };
   }
 

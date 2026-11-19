@@ -37,6 +37,7 @@ export class SmsService {
           text,
           sender_id: config.senderId,
         }),
+        signal: AbortSignal.timeout(12_000),
       });
 
       const body = (await response.json().catch(() => null)) as

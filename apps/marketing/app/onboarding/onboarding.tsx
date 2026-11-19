@@ -1901,16 +1901,26 @@ function maskEmail(email: string) {
   return `${local.slice(0, 2)}@${(name ?? "").slice(0, 1)}${suffix}`;
 }
 
+const AUTH_TIMEOUT_MS = 20_000;
+
 async function postAuth<T>(path: string, body: unknown): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
   try {
     response = await fetch(`/api/auth/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Délai dépassé. Réessaie dans un instant.");
+    }
     throw new Error("Le serveur ne répond pas.");
+  } finally {
+    window.clearTimeout(timer);
   }
 
   let payload: {

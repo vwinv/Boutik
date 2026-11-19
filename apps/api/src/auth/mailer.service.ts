@@ -37,15 +37,20 @@ export class MailerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const smtp = getSmtpConfig();
-    const transporter = this.getTransporter();
-    await transporter.sendMail({
-      from: smtp.from,
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    });
-    this.logger.info({ to: options.to, subject: options.subject }, "E-mail envoyé");
+    try {
+      const transporter = this.getTransporter();
+      await transporter.sendMail({
+        from: smtp.from,
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+      this.logger.info({ to: options.to, subject: options.subject }, "E-mail envoyé");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error({ to: options.to, subject: options.subject, err: message }, "Échec envoi e-mail");
+    }
   }
 
   private getTransporter() {
@@ -62,6 +67,9 @@ export class MailerService implements OnModuleInit, OnModuleDestroy {
         user: smtp.user,
         pass: smtp.password,
       },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
     return this.transporter;
   }
