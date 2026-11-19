@@ -6,6 +6,48 @@ import { fetchStaffMe, type StaffUser } from "../lib/auth";
 import { formatXof } from "../lib/format";
 import { AdminShell } from "./admin-shell";
 
+type ProSpace = {
+  id: string;
+  name: string;
+  slug: string;
+  status: "DRAFT" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  statusLabel: string;
+  category: string;
+  categoryLabel: string;
+  planName: string;
+  planTier: string;
+  siteStatus: string;
+  siteStatusLabel: string;
+};
+
+type ProAccount = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  phoneVerified: boolean;
+  emailVerified: boolean;
+  onboardingCategory: string | null;
+  onboardingCategoryLabel: string | null;
+  stage: "PENDING_PHONE" | "ONBOARDING" | "ACTIVE" | "SUSPENDED";
+  stageLabel: string;
+  professionalId: string | null;
+  professionalName: string;
+  spacesCount: number;
+  spaces: ProSpace[];
+  createdAt: string;
+};
+
+type ProsPayload = {
+  kpis: {
+    totalCount: number;
+    onboardingCount: number;
+    withSpaceCount: number;
+    suspendedCount: number;
+  };
+  items: ProAccount[];
+};
+
 type EspaceItem = {
   id: string;
   name: string;
@@ -37,6 +79,8 @@ type EspacesPayload = {
   items: EspaceItem[];
 };
 
+type Tab = "comptes" | "espaces";
+type StageFilter = "ALL" | ProAccount["stage"];
 type CategoryFilter = "ALL" | "BOUTIQUE" | "RESTAURANT" | "VITRINE";
 type StatusFilter = "ALL" | "ACTIVE" | "DRAFT" | "SUSPENDED";
 
@@ -49,25 +93,31 @@ export function ProfessionnelsPage() {
 }
 
 function ProfessionnelsBody() {
-  const [data, setData] = useState<EspacesPayload | null>(null);
+  const [tab, setTab] = useState<Tab>("comptes");
+  const [pros, setPros] = useState<ProsPayload | null>(null);
+  const [espaces, setEspaces] = useState<EspacesPayload | null>(null);
   const [me, setMe] = useState<StaffUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<StageFilter>("ALL");
   const [category, setCategory] = useState<CategoryFilter>("ALL");
   const [status, setStatus] = useState<StatusFilter>("ALL");
-  const [selected, setSelected] = useState<EspaceItem | null>(null);
+  const [selectedPro, setSelectedPro] = useState<ProAccount | null>(null);
+  const [selectedEspace, setSelectedEspace] = useState<EspaceItem | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [payload, user] = await Promise.all([
+      const [prosPayload, espacesPayload, user] = await Promise.all([
+        staffApi<ProsPayload>("/api/admin/professionnels"),
         staffApi<EspacesPayload>("/api/admin/espaces"),
         fetchStaffMe(),
       ]);
-      setData(payload);
+      setPros(prosPayload);
+      setEspaces(espacesPayload);
       setMe(user);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de charger les espaces.");
+      setError(err instanceof Error ? err.message : "Impossible de charger les professionnels.");
     }
   }, []);
 
@@ -75,14 +125,19 @@ function ProfessionnelsBody() {
     void load();
   }, [load]);
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    return data.items.filter((item) => {
+  const filteredPros = useMemo(() => {
+    if (!pros) return [];
+    return pros.items.filter((item) => (stage === "ALL" ? true : item.stage === stage));
+  }, [pros, stage]);
+
+  const filteredEspaces = useMemo(() => {
+    if (!espaces) return [];
+    return espaces.items.filter((item) => {
       if (category !== "ALL" && item.category !== category) return false;
       if (status !== "ALL" && item.status !== status) return false;
       return true;
     });
-  }, [data, category, status]);
+  }, [espaces, category, status]);
 
   const canModerate = me?.staffRole === "OWNER" || me?.staffRole === "ADMIN" || me?.staffRole === "MODERATION";
 
@@ -92,7 +147,8 @@ function ProfessionnelsBody() {
     try {
       await action();
       await load();
-      setSelected(null);
+      setSelectedEspace(null);
+      setSelectedPro(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action impossible.");
     } finally {
@@ -100,11 +156,11 @@ function ProfessionnelsBody() {
     }
   }
 
-  if (!data && !error) {
+  if (!pros && !espaces && !error) {
     return <p className="text-sm text-neutral-500">Chargement des professionnels…</p>;
   }
 
-  if (!data) {
+  if (!pros || !espaces) {
     return <p className="text-sm text-red-600">{error}</p>;
   }
 
@@ -112,132 +168,257 @@ function ProfessionnelsBody() {
     <div className="space-y-5">
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Kpi
-          dark
-          label="Comptes actifs"
-          value={String(data.kpis.activeCount)}
-          sub={`sur ${data.kpis.totalCount} espace${data.kpis.totalCount > 1 ? "s" : ""}`}
-        />
-        <Kpi label="Sites publiés" value={String(data.kpis.publishedCount)} sub="en ligne" />
-        <Kpi
-          label="Suspendus"
-          value={String(data.kpis.suspendedCount)}
-          sub={data.kpis.suspendedCount > 0 ? "modération" : "aucun"}
-        />
+      <div className="flex flex-wrap gap-2">
+        <TabButton active={tab === "comptes"} onClick={() => setTab("comptes")}>
+          Comptes pro ({pros.kpis.totalCount})
+        </TabButton>
+        <TabButton active={tab === "espaces"} onClick={() => setTab("espaces")}>
+          Espaces ({espaces.kpis.totalCount})
+        </TabButton>
       </div>
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <FilterPills
-          value={category}
-          onChange={setCategory}
-          options={[
-            ["ALL", "Toutes"],
-            ["BOUTIQUE", "Boutique"],
-            ["RESTAURANT", "Restaurant"],
-            ["VITRINE", "Site vitrine"],
-          ]}
-        />
-        <FilterPills
-          value={status}
-          onChange={setStatus}
-          options={[
-            ["ALL", "Tous"],
-            ["ACTIVE", "Actif"],
-            ["DRAFT", "Brouillon"],
-            ["SUSPENDED", "Suspendu"],
-          ]}
-        />
-      </div>
+      {tab === "comptes" ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Kpi
+              dark
+              label="Comptes pro"
+              value={String(pros.kpis.totalCount)}
+              sub={`${pros.kpis.onboardingCount} en inscription`}
+            />
+            <Kpi
+              label="Avec espace"
+              value={String(pros.kpis.withSpaceCount)}
+              sub="au moins un site"
+            />
+            <Kpi
+              label="Suspendus"
+              value={String(pros.kpis.suspendedCount)}
+              sub={pros.kpis.suspendedCount > 0 ? "modération" : "aucun"}
+            />
+          </div>
 
-      <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-white">
-        <table className="w-full min-w-[960px] text-left text-sm">
-          <thead className="bg-neutral-50 text-[11px] font-semibold tracking-[0.12em] text-neutral-400 uppercase">
-            <tr>
-              <th className="px-5 py-3">Professionnel</th>
-              <th className="px-5 py-3">Catégorie</th>
-              <th className="px-5 py-3">Offre</th>
-              <th className="px-5 py-3">Espace / site</th>
-              <th className="px-5 py-3">Wallet</th>
-              <th className="px-5 py-3">Compte</th>
-              <th className="px-5 py-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-neutral-400">
-                  Aucun espace pour ces filtres.
-                </td>
-              </tr>
-            ) : (
-              filtered.map((item) => (
-                <tr key={item.id} className="border-t border-neutral-100">
-                  <td className="px-5 py-4">
-                    <p className="font-semibold tracking-tight">{item.name}</p>
-                    <p className="mt-0.5 text-xs text-neutral-400">
-                      Inscrit le{" "}
-                      {new Date(item.createdAt).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </td>
-                  <td className="px-5 py-4 text-neutral-600">{item.categoryLabel}</td>
-                  <td className="px-5 py-4">
-                    <span className="font-medium">{item.planTier}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <Badge
-                      tone={
-                        item.siteStatus === "PUBLISHED"
-                          ? "green"
-                          : item.siteStatus === "SUSPENDED"
-                            ? "orange"
-                            : "gray"
-                      }
-                    >
-                      {item.siteStatusLabel}
-                    </Badge>
-                    <p className="mt-1 text-xs text-neutral-400">{item.siteHost}</p>
-                  </td>
-                  <td className="px-5 py-4 font-medium whitespace-nowrap">{formatXof(item.walletXof)}</td>
-                  <td className="px-5 py-4">
-                    <Badge
-                      tone={
-                        item.status === "ACTIVE" ? "green" : item.status === "SUSPENDED" ? "orange" : "gray"
-                      }
-                    >
-                      {item.statusLabel}
-                    </Badge>
-                  </td>
-                  <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      onClick={() => setSelected(item)}
-                      className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-sm font-semibold"
-                    >
-                      Gérer
-                    </button>
-                  </td>
+          <FilterPills
+            value={stage}
+            onChange={setStage}
+            options={[
+              ["ALL", "Tous"],
+              ["PENDING_PHONE", "Tél. à confirmer"],
+              ["ONBOARDING", "Inscription"],
+              ["ACTIVE", "Actif"],
+              ["SUSPENDED", "Suspendu"],
+            ]}
+          />
+
+          <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-white">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="bg-neutral-50 text-[11px] font-semibold tracking-[0.12em] text-neutral-400 uppercase">
+                <tr>
+                  <th className="px-5 py-3">Professionnel</th>
+                  <th className="px-5 py-3">Contact</th>
+                  <th className="px-5 py-3">Étape</th>
+                  <th className="px-5 py-3">Espaces</th>
+                  <th className="px-5 py-3">Inscription</th>
+                  <th className="px-5 py-3">Action</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {filteredPros.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-10 text-center text-neutral-400">
+                      Aucun compte professionnel pour ces filtres.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPros.map((item) => (
+                    <tr key={item.id} className="border-t border-neutral-100">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold tracking-tight">{item.professionalName}</p>
+                        <p className="mt-0.5 text-xs text-neutral-400">{item.email}</p>
+                      </td>
+                      <td className="px-5 py-4 text-neutral-600">
+                        <p>{item.phone || "—"}</p>
+                        <p className="mt-0.5 text-xs text-neutral-400">
+                          {item.phoneVerified ? "Tél. confirmé" : "Tél. non confirmé"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          tone={
+                            item.stage === "ACTIVE"
+                              ? "green"
+                              : item.stage === "SUSPENDED"
+                                ? "orange"
+                                : "gray"
+                          }
+                        >
+                          {item.stageLabel}
+                        </Badge>
+                        {item.onboardingCategoryLabel ? (
+                          <p className="mt-1 text-xs text-neutral-400">{item.onboardingCategoryLabel}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-5 py-4 text-neutral-600">
+                        {item.spacesCount === 0
+                          ? "Aucun"
+                          : item.spaces.map((space) => space.name).join(", ")}
+                      </td>
+                      <td className="px-5 py-4 text-neutral-500">
+                        {new Date(item.createdAt).toLocaleDateString("fr-FR", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPro(item)}
+                          className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-sm font-semibold"
+                        >
+                          Voir
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Kpi
+              dark
+              label="Espaces actifs"
+              value={String(espaces.kpis.activeCount)}
+              sub={`sur ${espaces.kpis.totalCount} espace${espaces.kpis.totalCount > 1 ? "s" : ""}`}
+            />
+            <Kpi label="Sites publiés" value={String(espaces.kpis.publishedCount)} sub="en ligne" />
+            <Kpi
+              label="Suspendus"
+              value={String(espaces.kpis.suspendedCount)}
+              sub={espaces.kpis.suspendedCount > 0 ? "modération" : "aucun"}
+            />
+          </div>
 
-      {selected ? (
-        <ManageModal
-          item={selected}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <FilterPills
+              value={category}
+              onChange={setCategory}
+              options={[
+                ["ALL", "Toutes"],
+                ["BOUTIQUE", "Boutique"],
+                ["RESTAURANT", "Restaurant"],
+                ["VITRINE", "Site vitrine"],
+              ]}
+            />
+            <FilterPills
+              value={status}
+              onChange={setStatus}
+              options={[
+                ["ALL", "Tous"],
+                ["ACTIVE", "Actif"],
+                ["DRAFT", "Brouillon"],
+                ["SUSPENDED", "Suspendu"],
+              ]}
+            />
+          </div>
+
+          <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-white">
+            <table className="w-full min-w-[960px] text-left text-sm">
+              <thead className="bg-neutral-50 text-[11px] font-semibold tracking-[0.12em] text-neutral-400 uppercase">
+                <tr>
+                  <th className="px-5 py-3">Espace</th>
+                  <th className="px-5 py-3">Catégorie</th>
+                  <th className="px-5 py-3">Offre</th>
+                  <th className="px-5 py-3">Site</th>
+                  <th className="px-5 py-3">Wallet</th>
+                  <th className="px-5 py-3">Compte</th>
+                  <th className="px-5 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEspaces.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-neutral-400">
+                      Aucun espace pour ces filtres.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredEspaces.map((item) => (
+                    <tr key={item.id} className="border-t border-neutral-100">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold tracking-tight">{item.name}</p>
+                        <p className="mt-0.5 text-xs text-neutral-400">
+                          {item.ownerEmail || item.professionalName}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4 text-neutral-600">{item.categoryLabel}</td>
+                      <td className="px-5 py-4">
+                        <span className="font-medium">{item.planTier}</span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          tone={
+                            item.siteStatus === "PUBLISHED"
+                              ? "green"
+                              : item.siteStatus === "SUSPENDED"
+                                ? "orange"
+                                : "gray"
+                          }
+                        >
+                          {item.siteStatusLabel}
+                        </Badge>
+                        <p className="mt-1 text-xs text-neutral-400">{item.siteHost}</p>
+                      </td>
+                      <td className="px-5 py-4 font-medium whitespace-nowrap">{formatXof(item.walletXof)}</td>
+                      <td className="px-5 py-4">
+                        <Badge
+                          tone={
+                            item.status === "ACTIVE"
+                              ? "green"
+                              : item.status === "SUSPENDED"
+                                ? "orange"
+                                : "gray"
+                          }
+                        >
+                          {item.statusLabel}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEspace(item)}
+                          className="rounded-full border border-neutral-200 px-3.5 py-1.5 text-sm font-semibold"
+                        >
+                          Gérer
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {selectedPro ? (
+        <ProDetailModal item={selectedPro} onClose={() => setSelectedPro(null)} />
+      ) : null}
+
+      {selectedEspace ? (
+        <ManageEspaceModal
+          item={selectedEspace}
           busy={busy}
           canModerate={Boolean(canModerate)}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedEspace(null)}
           onSuspend={() =>
             void runAction(async () => {
               const reason = window.prompt("Motif de suspension (optionnel)") ?? undefined;
-              await staffApi(`/api/admin/tenants/${selected.id}/suspend`, {
+              await staffApi(`/api/admin/tenants/${selectedEspace.id}/suspend`, {
                 method: "POST",
                 body: JSON.stringify({ reason: reason?.trim() || undefined }),
               });
@@ -245,7 +426,7 @@ function ProfessionnelsBody() {
           }
           onReactivate={() =>
             void runAction(() =>
-              staffApi(`/api/admin/tenants/${selected.id}/reactivate`, { method: "POST" }),
+              staffApi(`/api/admin/tenants/${selectedEspace.id}/reactivate`, { method: "POST" }),
             )
           }
         />
@@ -254,7 +435,47 @@ function ProfessionnelsBody() {
   );
 }
 
-function ManageModal({
+function ProDetailModal({ item, onClose }: { item: ProAccount; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 px-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl">
+        <h3 className="text-lg font-semibold tracking-tight">{item.professionalName}</h3>
+        <p className="mt-1 text-sm text-neutral-500">{item.email}</p>
+        <dl className="mt-5 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-neutral-500">Étape</dt>
+            <dd className="font-medium">{item.stageLabel}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-neutral-500">Téléphone</dt>
+            <dd className="font-medium">{item.phone || "—"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-neutral-500">Activité</dt>
+            <dd className="font-medium">{item.onboardingCategoryLabel || "—"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-neutral-500">Espaces</dt>
+            <dd className="font-medium text-right">
+              {item.spacesCount === 0
+                ? "Aucun pour l’instant"
+                : item.spaces.map((space) => `${space.name} (${space.statusLabel})`).join(", ")}
+            </dd>
+          </div>
+        </dl>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-semibold"
+        >
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ManageEspaceModal({
   item,
   busy,
   canModerate,
@@ -328,6 +549,28 @@ function ManageModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+        active ? "bg-neutral-950 text-white" : "border border-neutral-200 bg-white text-neutral-700"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

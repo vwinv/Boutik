@@ -9,7 +9,144 @@ import { presentWorkspace, workspaceWithRelations } from "../professionals/works
 export class AdminTenantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Liste admin « Professionnels & espaces » — pas de file d’attente de validation Boutik. */
+  /**
+   * Comptes pro (inscription + professionnels), pas seulement les espaces publiés.
+   * Un compte inscrit qui n’a pas encore d’espace reste visible ici.
+   */
+  async listProfessionnels() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        staffRole: "NONE",
+        OR: [
+          { professionals: { some: {} } },
+          { memberships: { some: {} } },
+          { onboardingCategory: { not: null } },
+          {
+            AND: [{ phone: { not: null } }, { customers: { none: {} } }],
+          },
+        ],
+      },
+      include: {
+        professionals: {
+          include: {
+            tenants: {
+              where: { status: { not: "ARCHIVED" } },
+              include: {
+                site: { select: { status: true } },
+                plan: { select: { name: true } },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        memberships: {
+          where: { tenant: { status: { not: "ARCHIVED" } } },
+          include: {
+            tenant: {
+              include: {
+                site: { select: { status: true } },
+                plan: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const items = users.map((user) => {
+      const byId = new Map<
+        string,
+        {
+          id: string;
+          name: string;
+          slug: string;
+          status: string;
+          category: string;
+          planName: string;
+          siteStatus: string;
+        }
+      >();
+
+      for (const professional of user.professionals) {
+        for (const tenant of professional.tenants) {
+          byId.set(tenant.id, {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            status: tenant.status,
+            category: tenant.category,
+            planName: tenant.plan?.name ?? "—",
+            siteStatus: tenant.site?.status ?? "DRAFT",
+          });
+        }
+      }
+      for (const membership of user.memberships) {
+        const tenant = membership.tenant;
+        byId.set(tenant.id, {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          status: tenant.status,
+          category: tenant.category,
+          planName: tenant.plan?.name ?? "—",
+          siteStatus: tenant.site?.status ?? "DRAFT",
+        });
+      }
+
+      const spaces = [...byId.values()].map((space) => ({
+        ...space,
+        categoryLabel: categoryLabel(space.category),
+        statusLabel: accountStatusLabel(space.status),
+        siteStatusLabel: siteStatusLabel(space.siteStatus),
+        planTier: planTierLabel(space.planName),
+      }));
+
+      const stage =
+        spaces.length === 0
+          ? user.phoneVerifiedAt
+            ? "ONBOARDING"
+            : "PENDING_PHONE"
+          : spaces.every((space) => space.status === "SUSPENDED")
+            ? "SUSPENDED"
+            : "ACTIVE";
+
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        phoneVerified: Boolean(user.phoneVerifiedAt),
+        emailVerified: Boolean(user.emailVerifiedAt),
+        onboardingCategory: user.onboardingCategory,
+        onboardingCategoryLabel: user.onboardingCategory
+          ? categoryLabel(user.onboardingCategory)
+          : null,
+        stage,
+        stageLabel: stageLabel(stage),
+        professionalId: user.professionals[0]?.id ?? null,
+        professionalName: user.professionals[0]?.displayName || user.name,
+        spacesCount: spaces.length,
+        spaces,
+        createdAt: user.createdAt.toISOString(),
+      };
+    });
+
+    return {
+      kpis: {
+        totalCount: items.length,
+        onboardingCount: items.filter(
+          (item) => item.stage === "ONBOARDING" || item.stage === "PENDING_PHONE",
+        ).length,
+        withSpaceCount: items.filter((item) => item.spacesCount > 0).length,
+        suspendedCount: items.filter((item) => item.stage === "SUSPENDED").length,
+      },
+      items,
+    };
+  }
+
+  /** Liste admin des espaces (sites) — complémentaire à listProfessionnels. */
   async listEspaces() {
     const tenants = await this.prisma.tenant.findMany({
       where: { status: { not: "ARCHIVED" } },
@@ -216,6 +353,14 @@ export class AdminTenantsService {
     }
     return tenant;
   }
+}
+
+function stageLabel(stage: string) {
+  if (stage === "PENDING_PHONE") return "Tél. à confirmer";
+  if (stage === "ONBOARDING") return "Inscription";
+  if (stage === "ACTIVE") return "Actif";
+  if (stage === "SUSPENDED") return "Suspendu";
+  return stage;
 }
 
 function categoryLabel(category: string) {

@@ -27,6 +27,12 @@ export class AdminTenantsController {
   }
 
   @StaffRoles("SUPPORT")
+  @Get("professionnels")
+  listProfessionnels() {
+    return this.tenants.listProfessionnels();
+  }
+
+  @StaffRoles("SUPPORT")
   @Get("professionals")
   listProfessionals() {
     return this.tenants.listProfessionals();
