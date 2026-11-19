@@ -102,6 +102,13 @@ export function ProShell({
     }
     void fetchProMe()
       .then((me) => {
+        const usable = me.memberships.filter((item) => item.status !== "ARCHIVED");
+        if (!usable.length) {
+          // Pas encore de boutique : renvoyer vers la connexion (reprise onboarding étape Activité).
+          clearProSession();
+          window.location.assign(proLoginUrl());
+          return;
+        }
         setUser(me);
         setMembership(activeProMembership(me));
       })

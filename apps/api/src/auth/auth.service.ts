@@ -463,8 +463,12 @@ export class AuthService {
   }
 
   async saveOnboardingContract(email: string, file?: Express.Multer.File) {
-    if (!file || file.mimetype !== "image/png" || file.size < 80) {
-      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Signez dans le cadre");
+    if (!file || file.size < 80) {
+      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Ajoutez une photo de votre signature");
+    }
+    assertUpload(file, SIGNATURE_TYPES, "La signature doit être un PNG, JPG ou WEBP");
+    if (file.size > 2 * 1024 * 1024) {
+      throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "La photo de signature dépasse 2 Mo");
     }
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user?.phoneVerifiedAt) {
@@ -475,7 +479,13 @@ export class AuthService {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Complétez les informations de votre activité");
     }
     if (previous.contract?.signatureKey) await this.storage.remove(previous.contract.signatureKey);
-    const signatureKey = `onboarding/${user.id}/signature/signature.png`;
+    const ext =
+      file.mimetype === "image/jpeg"
+        ? "jpg"
+        : file.mimetype === "image/webp"
+          ? "webp"
+          : "png";
+    const signatureKey = `onboarding/${user.id}/signature/signature.${ext}`;
     await this.storage.save(signatureKey, file.buffer);
     const contract: OnboardingContract = {
       version: "2026-11-02",
@@ -593,11 +603,18 @@ export class AuthService {
       throw new ApiException(API_ERROR_CODES.BAD_REQUEST, "Choisissez un modèle avant de publier");
     }
 
-    const existingMembership = await this.prisma.membership.findFirst({
-      where: { userId: user.id, tenant: { status: { not: "ARCHIVED" } } },
-      include: { tenant: true },
-      orderBy: { createdAt: "asc" },
-    });
+    // Republier la même boutique (idempotent) si le slug publié appartient déjà au compte.
+    // Sinon → nouvelle boutique sous le même professionnel (multi-espaces).
+    const existingMembership = previous.published?.slug
+      ? await this.prisma.membership.findFirst({
+          where: {
+            userId: user.id,
+            tenant: { status: { not: "ARCHIVED" }, slug: previous.published.slug },
+          },
+          include: { tenant: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : null;
     if (existingMembership) {
       const colors = themeColors(previous.theme!);
       const publishedAt = new Date();
@@ -944,19 +961,14 @@ export class AuthService {
 
   private async resumeOnboarding(user: User) {
     const profile = readOnboardingProfile(user.onboardingProfile);
-    let phase: "phone" | "activity" | "info" | "contract" | "template" | "content" | "preview" | "publish" = "phone";
-    if (user.phoneVerifiedAt) phase = "activity";
-    if (phase === "activity" && user.onboardingCategory) phase = "info";
-    if (phase === "info" && profile.businessName) phase = "contract";
-    if (phase === "contract" && profile.contract?.signedAt) phase = "template";
-    if (phase === "template" && profile.theme?.templateId) phase = "content";
-    if (phase === "content" && profile.content?.items?.length) phase = "preview";
-    if (phase === "preview" && profile.published?.slug) phase = "publish";
+    // Sans boutique : reprise à l’étape 2 (Activité). Téléphone d’abord si non confirmé.
+    const phase: "phone" | "activity" = user.phoneVerifiedAt ? "activity" : "phone";
     let signature = "";
     if (profile.contract?.signatureKey) {
       try {
         const bytes = await readFile(this.storage.absolutePath(profile.contract.signatureKey));
-        signature = `data:image/png;base64,${bytes.toString("base64")}`;
+        const mime = imageMimeFromName(profile.contract.signatureKey);
+        signature = `data:${mime};base64,${bytes.toString("base64")}`;
       } catch {
         signature = "";
       }
@@ -989,8 +1001,9 @@ export class AuthService {
         primary: profile.theme?.primary ?? "",
         secondary: profile.theme?.secondary ?? "",
         contentItems: profile.content?.items ?? [],
-        publishedSlug: profile.published?.slug ?? null,
-        publishedAt: profile.published?.publishedAt ?? null,
+        // Pas de boutique active : ne pas reprendre une publication précédente.
+        publishedSlug: null,
+        publishedAt: null,
       },
     };
   }
@@ -1406,6 +1419,7 @@ function themeColors(theme: OnboardingTheme) {
 
 const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/svg+xml", ".png", ".jpg", ".jpeg", ".svg"]);
 const COVER_TYPES = new Set(["image/png", "image/jpeg", "image/webp", ".png", ".jpg", ".jpeg", ".webp"]);
+const SIGNATURE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", ".png", ".jpg", ".jpeg", ".webp"]);
 
 function imageMimeFromName(name: string) {
   const lower = name.toLowerCase();

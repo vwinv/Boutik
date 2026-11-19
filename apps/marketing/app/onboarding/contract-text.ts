@@ -186,9 +186,9 @@ export const CONTRACT_SECTIONS: { heading: string; paragraphs: string[] }[] = [
   {
     heading: "Article 15 — Signature électronique",
     paragraphs: [
-      "La signature est réalisée dans l'espace de création du site. Le professionnel coche qu'il a lu le contrat et saisit son nom complet.",
-      "Ce geste, relié à son compte, à son téléphone vérifié, à la date et à la version du contrat, constitue la signature électronique. Entre les parties, il vaut signature du présent contrat.",
-      "Boutik conserve la preuve de la signature : nom, date, version et identifiant du compte.",
+      "La signature est réalisée dans l'espace de création du site. Le professionnel coche qu'il a lu le contrat et ajoute une photo de sa signature manuscrite.",
+      "Ce dépôt, relié à son compte, à son téléphone vérifié, à la date et à la version du contrat, constitue la signature électronique. Entre les parties, il vaut signature du présent contrat.",
+      "Boutik conserve la preuve de la signature : image, nom, date, version et identifiant du compte.",
     ],
   },
   {

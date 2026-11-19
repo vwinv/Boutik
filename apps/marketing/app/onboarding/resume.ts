@@ -77,7 +77,8 @@ export function storeResume(resume: OnboardingResume) {
       debugCode: null,
       confirmed: resume.phase !== "phone",
       category: resume.category ?? undefined,
-      phase: resume.phase,
+      // Sans boutique : forcer l’étape Activité (création d’espace).
+      phase: resume.phase === "phone" ? "phone" : "activity",
       accountCreated: true,
     }),
   );

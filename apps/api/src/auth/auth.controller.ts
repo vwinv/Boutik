@@ -162,7 +162,7 @@ export class AuthController {
 
   @Public()
   @Post("onboarding/contract")
-  @UseInterceptors(FileInterceptor("signature", { storage: memoryStorage(), limits: { fileSize: 512 * 1024 } }))
+  @UseInterceptors(FileInterceptor("signature", { storage: memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } }))
   saveContract(@Body() body: OnboardingContractDto, @UploadedFile() signature: Express.Multer.File) {
     return this.auth.saveOnboardingContract(body.email, signature);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CONTRACT_DIALOG, CONTRACT_SUMMARY } from "./contract-text";
 import { ContentStep } from "./content-step";
 import { contentCopy, emptyContent, newContentId, type ContentDraft } from "./content-data";
@@ -157,8 +157,16 @@ export function Onboarding() {
           setDebugCode(session.debugCode);
           setConfirmed(session.confirmed);
           setAccountCreated(Boolean(session.accountCreated));
-          setCategory("BOUTIQUE");
-          const nextPhase = session.phase ?? (session.confirmed ? "activity" : "phone");
+          setCategory(
+            session.category === "VITRINE" || session.category === "RESTAURANT" || session.category === "BOUTIQUE"
+              ? session.category
+              : "BOUTIQUE",
+          );
+          // Compte déjà créé sans boutique → étape Activité (ou téléphone si non confirmé).
+          const nextPhase =
+            session.accountCreated && session.confirmed
+              ? "activity"
+              : (session.phase ?? (session.confirmed ? "activity" : "phone"));
           setPhase(nextPhase);
           setFields((current) => ({
             ...current,
@@ -257,7 +265,15 @@ export function Onboarding() {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(CONTRACT_KEY, JSON.stringify(contract));
+    // Ne pas persister la photo de signature (trop lourde) — seule l’acceptation / l’état signé.
+    window.localStorage.setItem(
+      CONTRACT_KEY,
+      JSON.stringify({
+        accepted: contract.accepted,
+        signedAt: contract.signedAt,
+        signature: null,
+      }),
+    );
   }, [contract, hydrated]);
 
   useEffect(() => {
@@ -557,17 +573,27 @@ export function Onboarding() {
       return;
     }
     if (!contract.signature) {
-      setFormError("Signez dans le cadre.");
+      setFormError("Ajoutez une photo de votre signature.");
       return;
     }
     const raw = window.sessionStorage.getItem(VERIFY_KEY);
     const session = raw ? (JSON.parse(raw) as VerifySession) : null;
     const email = (session?.email || fields.email).trim();
-    const image = await fetch(contract.signature);
-    const blob = await image.blob();
+    const file =
+      dataUrlToFile(contract.signature, "signature.png") ??
+      (await fetch(contract.signature)
+        .then(async (response) => {
+          const blob = await response.blob();
+          return new File([blob], "signature.png", { type: blob.type || "image/png" });
+        })
+        .catch(() => null));
+    if (!file) {
+      setFormError("Impossible de lire la photo de signature. Réessayez.");
+      return;
+    }
     const body = new FormData();
     body.set("email", email);
-    body.set("signature", new File([blob], "signature.png", { type: "image/png" }));
+    body.set("signature", file);
     setPending(true);
     setFormError(null);
     try {
@@ -1342,7 +1368,9 @@ function ContractStep({
     <>
       <div className="pr-0 sm:pr-44">
         <h2 className="text-[32px] leading-none font-semibold tracking-tight">Votre contrat Boutik</h2>
-        <p className="mt-3 text-sm text-neutral-500">Lisez et signez le contrat de service pour continuer.</p>
+        <p className="mt-3 text-sm text-neutral-500">
+          Lisez le contrat, puis ajoutez une photo de votre signature pour continuer.
+        </p>
       </div>
 
       <div className="mt-8 grid items-start gap-6 md:grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)]">
@@ -1378,9 +1406,13 @@ function ContractStep({
           </label>
           <div className="mt-5">
             {signed && draft.signature ? (
-              <img src={draft.signature} alt="Signature" className="h-32 w-full rounded-xl border border-neutral-200 bg-white object-contain" />
+              <img
+                src={draft.signature}
+                alt="Signature"
+                className="h-32 w-full rounded-xl border border-neutral-200 bg-white object-contain"
+              />
             ) : (
-              <SignaturePad value={draft.signature} onChange={onSignature} />
+              <SignatureUpload value={draft.signature} onChange={onSignature} />
             )}
           </div>
         </div>
@@ -1410,106 +1442,74 @@ function ContractStep({
   );
 }
 
-function SignaturePad({
+function SignatureUpload({
   value,
   onChange,
 }: {
   value: string | null;
   onChange: (value: string | null) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-  const ink = useRef(Boolean(value));
-  const ratioRef = useRef(1);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    ratioRef.current = ratio;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    canvas.width = Math.floor(width * ratio);
-    canvas.height = Math.floor(height * ratio);
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.scale(ratio, ratio);
-    context.lineWidth = 2.2;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.strokeStyle = "#171717";
-    if (!value) return;
-    const image = new Image();
-    image.onload = () => context.drawImage(image, 0, 0, width, height);
-    image.src = value;
-    // The saved image is drawn once. Later strokes stay on this canvas.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function point(event: React.PointerEvent<HTMLCanvasElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  }
-
-  function start(event: React.PointerEvent<HTMLCanvasElement>) {
-    const context = canvasRef.current?.getContext("2d");
-    if (!context) return;
-    drawing.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const next = point(event);
-    context.beginPath();
-    context.moveTo(next.x, next.y);
-  }
-
-  function move(event: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
-    const context = canvasRef.current?.getContext("2d");
-    if (!context) return;
-    const next = point(event);
-    context.lineTo(next.x, next.y);
-    context.stroke();
-    ink.current = true;
-  }
-
-  function end() {
-    if (!drawing.current) return;
-    drawing.current = false;
-    const canvas = canvasRef.current;
-    if (canvas && ink.current) onChange(canvas.toDataURL("image/png"));
-  }
-
-  function clear() {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.scale(ratioRef.current, ratioRef.current);
-    context.lineWidth = 2.2;
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.strokeStyle = "#171717";
-    ink.current = false;
-    onChange(null);
+  function onFile(file: File | undefined) {
+    if (!file) return;
+    const allowed = /^image\/(png|jpeg|webp)$/i.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
+    if (!allowed) {
+      setLocalError("Formats acceptés : PNG, JPG ou WEBP.");
+      return;
+    }
+    if (file.size < 80) {
+      setLocalError("Le fichier est trop petit.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setLocalError("La photo dépasse 2 Mo.");
+      return;
+    }
+    setLocalError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") onChange(reader.result);
+    };
+    reader.onerror = () => setLocalError("Impossible de lire ce fichier.");
+    reader.readAsDataURL(file);
   }
 
   return (
-    <div className="relative h-32 overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <div className="pointer-events-none absolute right-[12%] bottom-8 left-[12%] border-b border-neutral-200" />
-      <canvas
-        ref={canvasRef}
-        aria-label="Signature"
-        className="relative h-full w-full touch-none"
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerCancel={end}
-      />
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-neutral-800">Signature</p>
       {value ? (
-        <button type="button" onClick={clear} className="absolute top-2 right-3 text-xs font-medium text-neutral-500">
-          Effacer
-        </button>
-      ) : null}
+        <div className="relative overflow-hidden rounded-xl border border-neutral-200 bg-white">
+          <img src={value} alt="Aperçu de la signature" className="h-32 w-full object-contain p-2" />
+          <button
+            type="button"
+            onClick={() => {
+              setLocalError(null);
+              onChange(null);
+            }}
+            className="absolute top-2 right-3 text-xs font-medium text-neutral-500"
+          >
+            Supprimer
+          </button>
+        </div>
+      ) : (
+        <label className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 text-center transition-colors hover:border-neutral-400 hover:bg-white">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+            className="sr-only"
+            onChange={(event) => {
+              onFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+          <span className="rounded-full bg-neutral-950 px-4 py-2 text-sm font-medium text-white">
+            Ajouter une signature photo
+          </span>
+          <span className="mt-2 text-xs text-neutral-500">PNG, JPG ou WEBP · 2 Mo max</span>
+        </label>
+      )}
+      {localError ? <p className="text-sm text-red-600">{localError}</p> : null}
     </div>
   );
 }
