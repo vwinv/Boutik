@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { siteUrl, tenantSlugFromHost, workspaceSlugFromHost } from "@boutik/domain";
 
-const WEB_ORIGIN = "http://127.0.0.1:3003";
-const APP_ORIGIN = "http://127.0.0.1:3002";
-const API_ORIGIN = "http://127.0.0.1:4000";
+const WEB_ORIGIN = (process.env.WEB_ORIGIN || "http://127.0.0.1:3003").replace(/\/$/, "");
+const APP_ORIGIN = (process.env.APP_ORIGIN || "http://127.0.0.1:3002").replace(/\/$/, "");
+const API_ORIGIN = (process.env.API_URL || "http://127.0.0.1:4000").replace(/\/$/, "");
 
 function isPublicAsset(pathname: string) {
   return (
@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
     if (pathname.startsWith("/api")) {
       return NextResponse.rewrite(new URL(pathname + search, API_ORIGIN));
     }
-    // L'app pro a basePath /app : chunks et HMR doivent venir de :3002.
+    // L'app pro a basePath /app : chunks et HMR doivent venir de APP_ORIGIN.
     if (pathname.startsWith("/_next")) {
       return NextResponse.rewrite(new URL(`/app${pathname}${search}`, APP_ORIGIN));
     }
@@ -41,7 +41,7 @@ export function middleware(request: NextRequest) {
     if (pathname.startsWith("/api")) {
       return NextResponse.rewrite(new URL(pathname + search, API_ORIGIN));
     }
-    // Les pages RSC/chunks du site public vivent sur :3003 — pas sur le marketing.
+    // Les pages RSC/chunks du site public vivent sur WEB_ORIGIN — pas sur le marketing.
     if (pathname.startsWith("/_next")) {
       return NextResponse.rewrite(new URL(pathname + search, WEB_ORIGIN));
     }
@@ -63,6 +63,15 @@ export function middleware(request: NextRequest) {
 
   const legacy = pathname.match(/^\/site\/([a-z0-9-]+)(\/.*)?$/);
   if (legacy?.[1]) {
+    // Fallback path-based : rewrite vers web si le wildcard DNS n’est pas encore prêt.
+    if (process.env.WEB_ORIGIN) {
+      const rest = legacy[2] || "/";
+      const path = rest === "/" ? `/${legacy[1]}` : `/${legacy[1]}${rest}`;
+      const rewriteUrl = new URL(path + search, WEB_ORIGIN);
+      const headers = new Headers(request.headers);
+      if (host) headers.set("x-forwarded-host", host);
+      return NextResponse.rewrite(rewriteUrl, { request: { headers } });
+    }
     return NextResponse.redirect(siteUrl(legacy[1], legacy[2] || "/"));
   }
 
